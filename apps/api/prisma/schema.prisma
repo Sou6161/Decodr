@@ -1,0 +1,143 @@
+// Arcloom data model.
+//
+// A Repository is the aggregate root. Analysis produces Files, Components,
+// Hooks and Routes, plus ComponentEdges that form the relationship graph.
+// The graph is persisted (Component nodes + ComponentEdge edges) so it can be
+// served and re-rendered without re-parsing the source.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum RepositoryStatus {
+  PENDING
+  EXTRACTING
+  SCANNING
+  ANALYZING
+  READY
+  FAILED
+}
+
+enum ExportKind {
+  DEFAULT
+  NAMED
+}
+
+enum GraphEdgeKind {
+  RENDERS
+}
+
+model Repository {
+  id     String           @id @default(cuid())
+  name   String
+  status RepositoryStatus @default(PENDING)
+  error  String?
+
+  /// Absolute path on disk where the extracted project lives.
+  storagePath String
+
+  // Denormalized counts for cheap list/dashboard rendering.
+  fileCount      Int @default(0)
+  componentCount Int @default(0)
+  hookCount      Int @default(0)
+  routeCount     Int @default(0)
+  totalLines     Int @default(0)
+
+  files      File[]
+  components  Component[]
+  hooks       Hook[]
+  routes      Route[]
+  edges       ComponentEdge[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([status])
+}
+
+model File {
+  id           String @id @default(cuid())
+  repositoryId String
+  repository   Repository @relation(fields: [repositoryId], references: [id], onDelete: Cascade)
+
+  /// Repo-relative path, e.g. "src/features/Dashboard/Dashboard.tsx".
+  path      String
+  sizeBytes Int
+  lineCount Int
+
+  components Component[]
+  hooks      Hook[]
+
+  @@unique([repositoryId, path])
+  @@index([repositoryId])
+}
+
+model Component {
+  id           String @id @default(cuid())
+  repositoryId String
+  repository   Repository @relation(fields: [repositoryId], references: [id], onDelete: Cascade)
+  fileId       String
+  file         File @relation(fields: [fileId], references: [id], onDelete: Cascade)
+
+  name           String
+  exportKind     ExportKind @default(NAMED)
+  isExported     Boolean    @default(false)
+  startLine      Int
+  endLine        Int
+  /// In-degree in the relationship graph (how many components import this one).
+  importedByCount Int       @default(0)
+
+  outgoingEdges ComponentEdge[] @relation("EdgeSource")
+  incomingEdges ComponentEdge[] @relation("EdgeTarget")
+
+  @@unique([repositoryId, name, fileId])
+  @@index([repositoryId])
+}
+
+model Hook {
+  id           String @id @default(cuid())
+  repositoryId String
+  repository   Repository @relation(fields: [repositoryId], references: [id], onDelete: Cascade)
+  fileId       String
+  file         File @relation(fields: [fileId], references: [id], onDelete: Cascade)
+
+  name       String
+  isExported Boolean @default(false)
+  startLine  Int
+  endLine    Int
+
+  @@index([repositoryId])
+}
+
+model Route {
+  id           String @id @default(cuid())
+  repositoryId String
+  repository   Repository @relation(fields: [repositoryId], references: [id], onDelete: Cascade)
+
+  path          String
+  componentName String?
+  filePath      String
+
+  @@index([repositoryId])
+}
+
+model ComponentEdge {
+  id           String @id @default(cuid())
+  repositoryId String
+  repository   Repository @relation(fields: [repositoryId], references: [id], onDelete: Cascade)
+
+  sourceId String
+  source   Component @relation("EdgeSource", fields: [sourceId], references: [id], onDelete: Cascade)
+  targetId String
+  target   Component @relation("EdgeTarget", fields: [targetId], references: [id], onDelete: Cascade)
+
+  kind GraphEdgeKind @default(RENDERS)
+
+  @@unique([sourceId, targetId, kind])
+  @@index([repositoryId])
+}

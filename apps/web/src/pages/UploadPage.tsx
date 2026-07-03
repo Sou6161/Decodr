@@ -1,0 +1,61 @@
+import { useNavigate } from 'react-router-dom';
+import { PageHeader } from '@/components/PageHeader';
+import { Card } from '@/components/ui';
+import { GraphIcon, SearchIcon, SparkIcon } from '@/components/icons';
+import { Dropzone } from '@/features/upload/Dropzone';
+import { useUploadRepository } from '@/features/upload/hooks';
+import { ApiClientError } from '@/services/apiClient';
+
+const STEPS = [
+  { icon: <SearchIcon />, title: 'Scan', description: 'Files are extracted and indexed.' },
+  { icon: <GraphIcon />, title: 'Map', description: 'Components and relationships are modeled.' },
+  { icon: <SparkIcon />, title: 'Explain', description: 'Ask how any feature works.' },
+];
+
+export function UploadPage() {
+  const navigate = useNavigate();
+  const upload = useUploadRepository();
+
+  const handleFile = (file: File) => {
+    upload.mutate(file, {
+      onSuccess: ({ repository }) => navigate(`/repositories/${repository.id}`),
+    });
+  };
+
+  const errorMessage =
+    upload.error instanceof ApiClientError
+      ? upload.error.apiError.message
+      : upload.error
+        ? 'Upload failed. Please try again.'
+        : null;
+
+  return (
+    <div>
+      <PageHeader
+        title="Upload repository"
+        description="Drop a ZIP of a React + TypeScript project to map its architecture."
+      />
+
+      <Dropzone
+        onFile={handleFile}
+        isUploading={upload.isPending}
+        error={errorMessage}
+      />
+
+      <div className="mt-8 grid grid-cols-1 gap-4 sm:grid-cols-3">
+        {STEPS.map((step, i) => (
+          <Card key={step.title} className="p-5">
+            <div className="flex items-center gap-3">
+              <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-primary/15 text-primary">
+                {step.icon}
+              </div>
+              <span className="text-xs font-medium text-subtle">Step {i + 1}</span>
+            </div>
+            <h3 className="mt-4 text-sm font-semibold text-foreground">{step.title}</h3>
+            <p className="mt-1 text-sm text-muted">{step.description}</p>
+          </Card>
+        ))}
+      </div>
+    </div>
+  );
+}

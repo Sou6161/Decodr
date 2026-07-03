@@ -1,0 +1,31 @@
+import type { Prisma, Repository as RepositoryModel } from '@prisma/client';
+import { prisma } from '../database/prisma.js';
+
+/**
+ * Data-access layer for repositories. Encapsulates all Prisma queries so
+ * services stay persistence-agnostic.
+ */
+export const repositoryRepository = {
+  create(data: Prisma.RepositoryCreateInput): Promise<RepositoryModel> {
+    return prisma.repository.create({ data });
+  },
+
+  findById(id: string): Promise<RepositoryModel | null> {
+    return prisma.repository.findUnique({ where: { id } });
+  },
+
+  list(): Promise<RepositoryModel[]> {
+    return prisma.repository.findMany({ orderBy: { createdAt: 'desc' } });
+  },
+
+  update(
+    id: string,
+    data: Prisma.RepositoryUpdateInput,
+  ): Promise<RepositoryModel> {
+    return prisma.repository.update({ where: { id }, data });
+  },
+
+  delete(id: string): Promise<RepositoryModel> {
+    return prisma.repository.delete({ where: { id } });
+  },
+};
