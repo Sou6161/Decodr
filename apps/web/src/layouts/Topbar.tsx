@@ -26,7 +26,7 @@ export function Topbar() {
         <Link to="/upload">
           <Button size="sm">
             <UploadIcon width={16} height={16} />
-            Upload repository
+            Upload project
           </Button>
         </Link>
       </div>

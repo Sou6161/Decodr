@@ -82,6 +82,44 @@ export const ArrowRightIcon = (p: IconProps) => (
   </Base>
 );
 
+export const TrashIcon = (p: IconProps) => (
+  <Base {...p}>
+    <path d="M4 7h16M9 7V5a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2m2 0v12a1 1 0 0 1-1 1H8a1 1 0 0 1-1-1V7" />
+    <path d="M10 11v5M14 11v5" />
+  </Base>
+);
+
+export const ChevronRightIcon = (p: IconProps) => (
+  <Base {...p}>
+    <path d="m9 6 6 6-6 6" />
+  </Base>
+);
+
+export const FolderIcon = (p: IconProps) => (
+  <Base {...p}>
+    <path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V7Z" />
+  </Base>
+);
+
+export const FileIcon = (p: IconProps) => (
+  <Base {...p}>
+    <path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8l-5-5Z" />
+    <path d="M14 3v5h5" />
+  </Base>
+);
+
+export const ExpandIcon = (p: IconProps) => (
+  <Base {...p}>
+    <path d="M8 3H5a2 2 0 0 0-2 2v3M16 3h3a2 2 0 0 1 2 2v3M21 16v3a2 2 0 0 1-2 2h-3M3 16v3a2 2 0 0 0 2 2h3" />
+  </Base>
+);
+
+export const CompressIcon = (p: IconProps) => (
+  <Base {...p}>
+    <path d="M8 3v3a2 2 0 0 1-2 2H3M16 3v3a2 2 0 0 0 2 2h3M21 16h-3a2 2 0 0 0-2 2v3M3 16h3a2 2 0 0 1 2 2v3" />
+  </Base>
+);
+
 /** Arcloom logomark — concentric node graph. */
 export function Logo({ className }: { className?: string }) {
   return (

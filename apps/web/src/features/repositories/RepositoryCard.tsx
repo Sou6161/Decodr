@@ -1,13 +1,23 @@
+import { useState, type MouseEvent } from 'react';
 import { Link } from 'react-router-dom';
 import type { Repository } from '@arcloom/types';
-import { Badge, Card } from '@/components/ui';
-import { ArrowRightIcon } from '@/components/icons';
+import { Badge, Card, ConfirmDialog } from '@/components/ui';
+import { ArrowRightIcon, TrashIcon } from '@/components/icons';
 import { STATUS_META } from './statusMeta';
+import { useDeleteRepository } from './hooks';
 
 const STAT = (label: string, value: number) => ({ label, value });
 
 export function RepositoryCard({ repository }: { repository: Repository }) {
   const status = STATUS_META[repository.status];
+  const [confirmOpen, setConfirmOpen] = useState(false);
+  const del = useDeleteRepository();
+
+  const openConfirm = (e: MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setConfirmOpen(true);
+  };
   const stats = [
     STAT('Files', repository.fileCount),
     STAT('Components', repository.componentCount),
@@ -17,8 +27,17 @@ export function RepositoryCard({ repository }: { repository: Repository }) {
 
   return (
     <Link to={`/repositories/${repository.id}`} className="group block">
-      <Card className="h-full p-5 transition-all duration-200 hover:border-border-strong hover:bg-surface-raised/60">
-        <div className="flex items-start justify-between gap-3">
+      <Card className="relative h-full p-5 transition-all duration-200 hover:border-border-strong hover:bg-surface-raised/60">
+        <button
+          type="button"
+          onClick={openConfirm}
+          aria-label={`Delete ${repository.name}`}
+          className="absolute right-3 top-3 rounded-lg p-1.5 text-subtle opacity-0 transition-all hover:bg-danger/15 hover:text-danger focus-visible:opacity-100 group-hover:opacity-100"
+        >
+          <TrashIcon width={16} height={16} />
+        </button>
+
+        <div className="flex items-start justify-between gap-3 pr-8">
           <h3 className="truncate text-sm font-semibold text-foreground">
             {repository.name}
           </h3>
@@ -48,6 +67,17 @@ export function RepositoryCard({ repository }: { repository: Repository }) {
           </span>
         </div>
       </Card>
+
+      <ConfirmDialog
+        open={confirmOpen}
+        title="Delete project?"
+        description={`"${repository.name}" and its analysis will be permanently removed. This can't be undone.`}
+        confirmLabel="Delete"
+        destructive
+        loading={del.isPending}
+        onConfirm={() => del.mutate(repository.id, { onSuccess: () => setConfirmOpen(false) })}
+        onClose={() => setConfirmOpen(false)}
+      />
     </Link>
   );
 }

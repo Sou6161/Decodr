@@ -25,7 +25,7 @@ export function layoutGraph(graph: RepositoryGraph): {
 } {
   const g = new dagre.graphlib.Graph();
   g.setDefaultEdgeLabel(() => ({}));
-  g.setGraph({ rankdir: 'TB', nodesep: 48, ranksep: 90, marginx: 24, marginy: 24 });
+  g.setGraph({ rankdir: 'TB', nodesep: 64, ranksep: 120, marginx: 24, marginy: 24 });
 
   for (const node of graph.nodes) {
     g.setNode(node.id, { width: NODE_WIDTH, height: NODE_HEIGHT });

@@ -3,6 +3,7 @@ import { AnimatePresence, motion } from 'framer-motion';
 import { Sidebar } from './Sidebar';
 import { Topbar } from './Topbar';
 import { CloseIcon } from '@/components/icons';
+import { Toaster } from '@/components/ui';
 import { useUIStore } from '@/stores/uiStore';
 
 /** Persistent app chrome: fixed sidebar (desktop), drawer (mobile), topbar, animated outlet. */
@@ -67,6 +68,8 @@ export function AppShell() {
           </AnimatePresence>
         </main>
       </div>
+
+      <Toaster />
     </div>
   );
 }

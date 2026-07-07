@@ -1,39 +1,46 @@
-import { Suspense, useEffect } from 'react';
-import { NavLink, Outlet, Link, useParams } from 'react-router-dom';
+import { Suspense, useEffect, useState } from 'react';
+import { Outlet, useNavigate, useParams } from 'react-router-dom';
 import { useQueryClient } from '@tanstack/react-query';
 import { RepositoryStatus } from '@arcloom/types';
 import { PageHeader } from '@/components/PageHeader';
-import { Badge, Button, ErrorState, Skeleton } from '@/components/ui';
+import { Badge, ConfirmDialog, ErrorState, Skeleton } from '@/components/ui';
+import { TrashIcon } from '@/components/icons';
 import {
+  useDeleteRepository,
   useRepository,
   useRepositoryProgress,
 } from '@/features/repositories/hooks';
 import { repositoryKeys } from '@/features/repositories/api';
 import { STATUS_META } from '@/features/repositories/statusMeta';
 import { ProcessingView } from '@/features/repositories/ProcessingView';
-import { cn } from '@/utils/cn';
-
-const TABS = [
-  { to: '', label: 'Dashboard', end: true },
-  { to: 'graph', label: 'Graph', end: false },
-  { to: 'explain', label: 'Explain', end: false },
-];
+import { ApiClientError } from '@/services/apiClient';
 
 /**
- * Shell for a single repository: loads it, gates on processing status, and
- * renders tabbed sub-views (Overview, Graph, …) via the router Outlet. The
- * loaded Repository is passed to children through the Outlet context.
+ * Shell for a single project: loads it, gates on processing status, and renders
+ * the current sub-view (Dashboard / Graph / Explain) via the router Outlet —
+ * navigation lives in the sidebar. The loaded project is passed to children
+ * through the Outlet context.
  */
 export function RepositoryLayout() {
   const { id } = useParams<{ id: string }>();
+  const navigate = useNavigate();
   const queryClient = useQueryClient();
-  const { data: repo, isLoading, isError, refetch } = useRepository(id);
+  const { data: repo, isLoading, isError, error, refetch } = useRepository(id);
+  const del = useDeleteRepository();
+  const [confirmOpen, setConfirmOpen] = useState(false);
 
   const isSettled =
     repo?.status === RepositoryStatus.Ready ||
     repo?.status === RepositoryStatus.Failed;
 
   const { data: progress } = useRepositoryProgress(id, Boolean(repo) && !isSettled);
+
+  // A missing project (deleted, or a stale/invalid URL) → bounce to Projects,
+  // no scary error screen.
+  const notFound = error instanceof ApiClientError && error.status === 404;
+  useEffect(() => {
+    if (notFound) navigate('/', { replace: true });
+  }, [notFound, navigate]);
 
   useEffect(() => {
     if (!id || !progress) return;
@@ -55,11 +62,14 @@ export function RepositoryLayout() {
     );
   }
 
+  // A 404 is handled by the redirect effect above — render nothing meanwhile.
+  if (notFound) return null;
+
   if (isError || !repo) {
     return (
       <ErrorState
-        title="Repository not found"
-        description="It may have been removed, or the id is invalid."
+        title="Couldn't load this project"
+        description="The API may be offline. Try again in a moment."
         action={{ label: 'Retry', onClick: () => void refetch() }}
       />
     );
@@ -72,8 +82,34 @@ export function RepositoryLayout() {
     <div>
       <PageHeader
         title={repo.name}
-        description={ready ? undefined : 'Processing repository'}
-        actions={<Badge tone={status.tone}>{status.label}</Badge>}
+        description={ready ? undefined : 'Processing project'}
+        actions={
+          <div className="flex items-center gap-2">
+            <Badge tone={status.tone}>{status.label}</Badge>
+            <button
+              type="button"
+              onClick={() => setConfirmOpen(true)}
+              aria-label="Delete project"
+              className="rounded-lg p-2 text-subtle transition-colors hover:bg-danger/15 hover:text-danger"
+              title="Delete project"
+            >
+              <TrashIcon width={16} height={16} />
+            </button>
+          </div>
+        }
+      />
+
+      <ConfirmDialog
+        open={confirmOpen}
+        title="Delete project?"
+        description={`"${repo.name}" and its analysis will be permanently removed. This can't be undone.`}
+        confirmLabel="Delete"
+        destructive
+        loading={del.isPending}
+        onConfirm={() =>
+          del.mutate(repo.id, { onSuccess: () => navigate('/', { replace: true }) })
+        }
+        onClose={() => setConfirmOpen(false)}
       />
 
       {!ready ? (
@@ -87,44 +123,12 @@ export function RepositoryLayout() {
           }
         />
       ) : (
-        <>
-          <nav className="mb-6 flex items-center gap-1 border-b border-border">
-            {TABS.map((tab) => (
-              <NavLink
-                key={tab.label}
-                to={tab.to}
-                end={tab.end}
-                className={({ isActive }) =>
-                  cn(
-                    '-mb-px border-b-2 px-4 py-2.5 text-sm font-medium transition-colors',
-                    isActive
-                      ? 'border-primary text-foreground'
-                      : 'border-transparent text-muted hover:text-foreground',
-                  )
-                }
-              >
-                {tab.label}
-              </NavLink>
-            ))}
-          </nav>
-
-          <Suspense
-            fallback={
-              <Skeleton className="h-[calc(100vh-15rem)] min-h-[460px] rounded-2xl" />
-            }
-          >
-            <Outlet context={repo} />
-          </Suspense>
-        </>
+        <Suspense
+          fallback={<Skeleton className="h-[calc(100vh-15rem)] min-h-[460px] rounded-2xl" />}
+        >
+          <Outlet context={repo} />
+        </Suspense>
       )}
-
-      <div className="mt-8">
-        <Link to="/">
-          <Button variant="secondary" size="sm">
-            ← Back to repositories
-          </Button>
-        </Link>
-      </div>
     </div>
   );
 }

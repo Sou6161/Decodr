@@ -8,4 +8,5 @@ export * from './analysis.js';
 export * from './graph.js';
 export * from './dashboard.js';
 export * from './ai.js';
+export * from './conversation.js';
 export * from './api.js';

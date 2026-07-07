@@ -1,6 +1,8 @@
-import { useQuery } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { RepositoryStatus } from '@arcloom/types';
 import { repositoriesApi, repositoryKeys } from './api';
+import { toast } from '@/stores/toastStore';
+import { ApiClientError } from '@/services/apiClient';
 
 /** True for statuses where processing has settled (no more polling needed). */
 function isTerminal(status: RepositoryStatus): boolean {
@@ -21,6 +23,24 @@ export function useRepository(id: string | undefined) {
     queryKey: repositoryKeys.detail(id ?? ''),
     queryFn: async () => (await repositoriesApi.detail(id as string)).repository,
     enabled: Boolean(id),
+  });
+}
+
+/** Deletes a repository and refreshes the list, with toast feedback. */
+export function useDeleteRepository() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) => repositoriesApi.remove(id),
+    onSuccess: (_data, id) => {
+      queryClient.removeQueries({ queryKey: repositoryKeys.detail(id) });
+      void queryClient.invalidateQueries({ queryKey: repositoryKeys.all });
+      toast.success('Project deleted');
+    },
+    onError: (error) => {
+      const message =
+        error instanceof ApiClientError ? error.apiError.message : 'Could not delete project';
+      toast.error('Delete failed', message);
+    },
   });
 }
 

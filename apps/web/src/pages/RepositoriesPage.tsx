@@ -1,9 +1,11 @@
 import { useNavigate } from 'react-router-dom';
+import { motion } from 'framer-motion';
 import { PageHeader } from '@/components/PageHeader';
-import { Button, EmptyState, ErrorState, Skeleton } from '@/components/ui';
+import { EmptyState, ErrorState, Skeleton } from '@/components/ui';
 import { UploadIcon } from '@/components/icons';
 import { useRepositories } from '@/features/repositories/hooks';
 import { RepositoryCard } from '@/features/repositories/RepositoryCard';
+import { fadeUpItem, staggerContainer } from '@/utils/motion';
 
 export function RepositoriesPage() {
   const navigate = useNavigate();
@@ -12,14 +14,8 @@ export function RepositoriesPage() {
   return (
     <div>
       <PageHeader
-        title="Repositories"
-        description="Upload a React + TypeScript project to map its architecture."
-        actions={
-          <Button onClick={() => navigate('/upload')}>
-            <UploadIcon width={16} height={16} />
-            Upload repository
-          </Button>
-        }
+        title="Projects"
+        description="Upload a codebase to explore its structure, dependencies, and components."
       />
 
       {isLoading && (
@@ -32,7 +28,7 @@ export function RepositoriesPage() {
 
       {isError && (
         <ErrorState
-          title="Couldn't load repositories"
+          title="Couldn't load projects"
           description="The API may be offline. Check that the backend is running."
           action={{ label: 'Retry', onClick: () => void refetch() }}
         />
@@ -41,18 +37,25 @@ export function RepositoriesPage() {
       {data && data.length === 0 && (
         <EmptyState
           icon={<UploadIcon width={28} height={28} />}
-          title="No repositories yet"
-          description="Upload a ZIP of a React + TypeScript project and Arcloom will analyze its architecture."
-          action={{ label: 'Upload your first repository', onClick: () => navigate('/upload') }}
+          title="No projects yet"
+          description="Upload a project folder and Arcloom will map its components, dependencies, and structure."
+          action={{ label: 'Upload your first project', onClick: () => navigate('/upload') }}
         />
       )}
 
       {data && data.length > 0 && (
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
+        <motion.div
+          variants={staggerContainer}
+          initial="hidden"
+          animate="show"
+          className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3"
+        >
           {data.map((repo) => (
-            <RepositoryCard key={repo.id} repository={repo} />
+            <motion.div key={repo.id} variants={fadeUpItem}>
+              <RepositoryCard repository={repo} />
+            </motion.div>
           ))}
-        </div>
+        </motion.div>
       )}
     </div>
   );

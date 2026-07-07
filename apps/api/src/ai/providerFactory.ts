@@ -16,6 +16,12 @@ export function createAIProvider(): AIProvider {
         apiKey: env.OPENAI_API_KEY,
         model: env.AI_MODEL,
         baseURL: env.OPENAI_BASE_URL,
+        // OpenRouter attribution headers (harmless/ignored by other providers).
+        headers: {
+          'HTTP-Referer': env.WEB_ORIGIN,
+          'X-Title': env.AI_SITE_NAME,
+        },
+        reasoning: env.AI_REASONING,
       });
     case AIProviderName.Claude:
     case AIProviderName.Gemini:

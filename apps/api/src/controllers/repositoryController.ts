@@ -1,5 +1,4 @@
 import type { Request, Response } from 'express';
-import { z } from 'zod';
 import type {
   ListRepositoriesResponse,
   RepositoryDashboardResponse,
@@ -12,12 +11,7 @@ import { repositoryService } from '../services/repositoryService.js';
 import { uploadService } from '../services/uploadService.js';
 import { getRepositoryGraph } from '../services/graphService.js';
 import { getDashboard } from '../services/dashboardService.js';
-import { explainRepository } from '../services/explanationService.js';
 import { AppError } from '../utils/AppError.js';
-
-const ExplainBodySchema = z.object({
-  question: z.string().min(3, 'Question is too short').max(500, 'Question is too long'),
-});
 
 /** Thin HTTP layer: parse input, call a service, shape the response. */
 export const repositoryController = {
@@ -33,6 +27,11 @@ export const repositoryController = {
     res.json(body);
   },
 
+  async remove(req: Request, res: Response): Promise<void> {
+    await repositoryService.remove(requireId(req));
+    res.status(204).send();
+  },
+
   async progress(req: Request, res: Response): Promise<void> {
     const progress = await repositoryService.getProgress(requireId(req));
     const body: RepositoryProgressResponse = { progress };
@@ -44,6 +43,35 @@ export const repositoryController = {
       throw AppError.badRequest('Attach a .zip file under the form field "file".');
     }
     const repository = await uploadService.uploadAndProcess(req.file);
+    const body: UploadRepositoryResponse = { repository };
+    res.status(202).json(body);
+  },
+
+  async uploadFolder(req: Request, res: Response): Promise<void> {
+    const files = (req.files as Express.Multer.File[] | undefined) ?? [];
+    if (files.length === 0) {
+      throw AppError.badRequest('No source files were uploaded.');
+    }
+
+    let manifest: unknown;
+    try {
+      manifest = JSON.parse(String(req.body.manifest ?? '[]'));
+    } catch {
+      throw AppError.badRequest('Invalid upload manifest.');
+    }
+    if (!Array.isArray(manifest) || manifest.length !== files.length) {
+      throw AppError.badRequest('Upload manifest does not match the uploaded files.');
+    }
+
+    const staged = files.map((f, i) => ({
+      tempPath: f.path,
+      relativePath: sanitizeRelative(String(manifest[i])),
+    }));
+
+    const repository = await uploadService.uploadFolderAndProcess({
+      name: String(req.body.name ?? 'project'),
+      files: staged,
+    });
     const body: UploadRepositoryResponse = { repository };
     res.status(202).json(body);
   },
@@ -69,17 +97,17 @@ export const repositoryController = {
     const body = await repositoryService.getEntities(requireId(req));
     res.json(body);
   },
-
-  async explain(req: Request, res: Response): Promise<void> {
-    const id = requireId(req);
-    const { question } = ExplainBodySchema.parse(req.body);
-    const body = await explainRepository(id, question);
-    res.json(body);
-  },
 };
 
 function requireId(req: Request): string {
   const id = req.params.id;
   if (!id) throw AppError.badRequest('Missing repository id');
   return id;
+}
+
+/** Normalizes a client-supplied relative path and strips any traversal. */
+function sanitizeRelative(raw: string): string {
+  const normalized = raw.replace(/\\/g, '/').replace(/^\/+/, '');
+  const parts = normalized.split('/').filter((p) => p && p !== '.' && p !== '..');
+  return parts.join('/');
 }

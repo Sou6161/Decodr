@@ -3,7 +3,11 @@ import type {
   RepositoryEntitiesResponse,
   RepositoryProgress,
 } from '@arcloom/types';
+import path from 'node:path';
 import { RepositoryStatus } from '@arcloom/types';
+import { storageRoot } from '../config/env.js';
+import { removeDir } from '../utils/archive.js';
+import { logger } from '../utils/logger.js';
 import { repositoryRepository } from '../repositories/repositoryRepository.js';
 import { fileRepository } from '../repositories/fileRepository.js';
 import { componentRepository } from '../repositories/componentRepository.js';
@@ -50,6 +54,16 @@ export const repositoryService = {
       percent: base.percent,
       message: repo.error ?? base.message,
     };
+  },
+
+  /** Deletes a repository (cascades to its entities) and reclaims its storage. */
+  async remove(id: string): Promise<void> {
+    await this.getById(id); // 404 if missing
+    await repositoryRepository.delete(id);
+    // Extraction lives at storageRoot/{id}; remove the whole tree.
+    await removeDir(path.join(storageRoot, id)).catch((err) =>
+      logger.warn(`Failed to remove storage for ${id}`, err),
+    );
   },
 
   /** Returns all extracted entities for a repository (files, components, hooks, routes). */

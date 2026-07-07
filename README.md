@@ -23,10 +23,10 @@ Arcloom is an intelligent codebase-analysis platform for React + TypeScript proj
 
 | Layer    | Tech |
 | -------- | ---- |
-| Frontend | React 19, TypeScript, Vite, Tailwind CSS v4, React Router v7, Zustand, TanStack Query, React Flow, Framer Motion (UI primitives hand-built) |
+| Frontend | React 19, TypeScript, Vite, Tailwind CSS v4, React Router v7, Zustand, TanStack Query, React Flow, dagre, Framer Motion (all UI primitives hand-built) |
 | Backend  | Node.js, Express, TypeScript |
 | Database | PostgreSQL + Prisma ORM |
-| AI       | Provider abstraction (OpenAI first; Claude / Gemini / Ollama as future providers) |
+| AI       | Provider abstraction (OpenAI-compatible; OpenRouter by default — Claude / Gemini / Ollama as future providers) |
 
 ---
 

@@ -12,6 +12,7 @@ export const repositoriesApi = {
     apiClient.get<RepositoryDetailResponse>(`/repositories/${id}`),
   progress: (id: string) =>
     apiClient.get<RepositoryProgressResponse>(`/repositories/${id}/progress`),
+  remove: (id: string) => apiClient.delete<void>(`/repositories/${id}`),
 };
 
 /** Query keys, centralized to avoid string drift across hooks. */

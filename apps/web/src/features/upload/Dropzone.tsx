@@ -1,50 +1,70 @@
 import { useCallback, useRef, useState, type DragEvent } from 'react';
 import { cn } from '@/utils/cn';
-import { UploadIcon } from '@/components/icons';
+import { FolderIcon, UploadIcon } from '@/components/icons';
 import { Spinner } from '@/components/ui';
+import {
+  collectFromDataTransfer,
+  collectFromInput,
+  filterSourceFiles,
+  rootName,
+  type UploadSelection,
+} from './collectFiles';
 
 interface DropzoneProps {
-  onFile: (file: File) => void;
-  disabled?: boolean;
+  onSelect: (selection: UploadSelection) => void;
   isUploading?: boolean;
   error?: string | null;
 }
 
-const MAX_MB = 50;
+const MAX_ZIP_MB = Number(import.meta.env.VITE_MAX_UPLOAD_MB ?? 500);
 
-/** Hand-built drag-and-drop ZIP picker. No third-party dropzone library. */
-export function Dropzone({ onFile, disabled, isUploading, error }: DropzoneProps) {
-  const inputRef = useRef<HTMLInputElement>(null);
+/** Hand-built folder / ZIP picker: pick a folder, drop a folder, or drop a .zip. */
+export function Dropzone({ onSelect, isUploading, error }: DropzoneProps) {
+  const folderRef = useRef<HTMLInputElement>(null);
+  const zipRef = useRef<HTMLInputElement>(null);
   const [dragging, setDragging] = useState(false);
   const [localError, setLocalError] = useState<string | null>(null);
 
-  const validateAndEmit = useCallback(
-    (file: File | undefined) => {
+  const emit = useCallback(
+    (selection: UploadSelection | null) => {
       setLocalError(null);
-      if (!file) return;
-      if (!file.name.toLowerCase().endsWith('.zip')) {
-        setLocalError('Only .zip files are supported.');
+      if (!selection) {
+        setLocalError('Drop a project folder or a .zip file.');
         return;
       }
-      if (file.size > MAX_MB * 1024 * 1024) {
-        setLocalError(`File too large. Maximum size is ${MAX_MB} MB.`);
+      if (selection.kind === 'folder' && selection.files.length === 0) {
+        setLocalError('No source files (.ts, .tsx, .js, .jsx) found in that folder.');
         return;
       }
-      onFile(file);
+      if (selection.kind === 'zip' && selection.file.size > MAX_ZIP_MB * 1024 * 1024) {
+        setLocalError(`ZIP too large. Maximum size is ${MAX_ZIP_MB} MB.`);
+        return;
+      }
+      onSelect(selection);
     },
-    [onFile],
+    [onSelect],
   );
 
-  const handleDrop = (e: DragEvent<HTMLDivElement>) => {
+  const handleDrop = async (e: DragEvent<HTMLDivElement>) => {
     e.preventDefault();
     setDragging(false);
-    if (disabled || isUploading) return;
-    validateAndEmit(e.dataTransfer.files?.[0]);
+    if (isUploading) return;
+    emit(await collectFromDataTransfer(e.dataTransfer));
   };
 
-  const handleDragOver = (e: DragEvent<HTMLDivElement>) => {
-    e.preventDefault();
-    if (!disabled && !isUploading) setDragging(true);
+  const handleFolderInput = (fileList: FileList | null) => {
+    if (!fileList || fileList.length === 0) return;
+    const files = filterSourceFiles(collectFromInput(fileList));
+    emit({ kind: 'folder', files, name: rootName(files) });
+  };
+
+  const handleZipInput = (file: File | undefined) => {
+    if (!file) return;
+    if (!file.name.toLowerCase().endsWith('.zip')) {
+      setLocalError('That file is not a .zip.');
+      return;
+    }
+    emit({ kind: 'zip', file });
   };
 
   const shownError = localError ?? error;
@@ -54,24 +74,27 @@ export function Dropzone({ onFile, disabled, isUploading, error }: DropzoneProps
       <div
         role="button"
         tabIndex={0}
-        aria-disabled={disabled || isUploading}
-        onClick={() => !isUploading && inputRef.current?.click()}
+        aria-disabled={isUploading}
+        onClick={() => !isUploading && folderRef.current?.click()}
         onKeyDown={(e) => {
           if ((e.key === 'Enter' || e.key === ' ') && !isUploading) {
             e.preventDefault();
-            inputRef.current?.click();
+            folderRef.current?.click();
           }
         }}
         onDrop={handleDrop}
-        onDragOver={handleDragOver}
+        onDragOver={(e) => {
+          e.preventDefault();
+          if (!isUploading) setDragging(true);
+        }}
         onDragLeave={() => setDragging(false)}
         className={cn(
-          'flex cursor-pointer flex-col items-center justify-center rounded-2xl border-2 border-dashed px-6 py-20 text-center transition-all duration-200',
+          'flex cursor-pointer flex-col items-center justify-center rounded-2xl border-2 border-dashed px-6 py-16 text-center transition-all duration-200',
           'outline-none focus-visible:ring-2 focus-visible:ring-primary/60',
           dragging
             ? 'border-primary bg-primary/5'
             : 'border-border hover:border-border-strong hover:bg-surface-raised/40',
-          (disabled || isUploading) && 'pointer-events-none opacity-70',
+          isUploading && 'pointer-events-none opacity-70',
         )}
       >
         <div
@@ -80,24 +103,52 @@ export function Dropzone({ onFile, disabled, isUploading, error }: DropzoneProps
             dragging ? 'bg-primary/20 text-primary' : 'bg-surface-raised text-subtle',
           )}
         >
-          {isUploading ? <Spinner className="h-6 w-6" /> : <UploadIcon width={28} height={28} />}
+          {isUploading ? <Spinner className="h-6 w-6" /> : <FolderIcon width={28} height={28} />}
         </div>
 
         <h3 className="text-base font-semibold text-foreground">
-          {isUploading ? 'Uploading…' : dragging ? 'Drop to upload' : 'Drop your ZIP here'}
+          {isUploading ? 'Uploading…' : dragging ? 'Drop to upload' : 'Drop your project folder here'}
         </h3>
         <p className="mt-1.5 max-w-md text-sm text-muted">
           {isUploading
-            ? 'Sending your project to Arcloom.'
-            : 'Drag and drop, or click to browse. React + TypeScript projects only · max 50 MB.'}
+            ? 'Sending your source files to Arcloom.'
+            : 'Drag a folder, or click to choose one. Only source files are read — node_modules, builds, and .git are skipped automatically.'}
         </p>
 
+        {!isUploading && (
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              zipRef.current?.click();
+            }}
+            className="mt-4 inline-flex items-center gap-1.5 text-xs font-medium text-muted underline-offset-2 hover:text-foreground hover:underline"
+          >
+            <UploadIcon width={14} height={14} />
+            or upload a .zip instead
+          </button>
+        )}
+
+        {/* Folder picker: webkitdirectory is set imperatively (not a standard React prop). */}
         <input
-          ref={inputRef}
+          ref={(el) => {
+            folderRef.current = el;
+            if (el) {
+              el.setAttribute('webkitdirectory', '');
+              el.setAttribute('directory', '');
+            }
+          }}
+          type="file"
+          multiple
+          className="hidden"
+          onChange={(e) => handleFolderInput(e.target.files)}
+        />
+        <input
+          ref={zipRef}
           type="file"
           accept=".zip,application/zip,application/x-zip-compressed"
           className="hidden"
-          onChange={(e) => validateAndEmit(e.target.files?.[0] ?? undefined)}
+          onChange={(e) => handleZipInput(e.target.files?.[0] ?? undefined)}
         />
       </div>
 

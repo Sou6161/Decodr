@@ -1,6 +1,6 @@
 import type {
   DashboardStats,
-  FolderSummary,
+  FolderTreeNode,
   RankedComponent,
 } from '@arcloom/types';
 import { repositoryRepository } from '../repositories/repositoryRepository.js';
@@ -14,16 +14,20 @@ const RANK_LIMIT = 8;
 const lineSpan = (c: ComponentWithPath): number =>
   Math.max(1, c.endLine - c.startLine + 1);
 
-/** Parent directory of a repo-relative path (POSIX), or "." for root files. */
-const dirOf = (path: string): string => {
-  const i = path.lastIndexOf('/');
-  return i === -1 ? '.' : path.slice(0, i);
-};
+/** Mutable tree node used while building; converted to the DTO at the end. */
+interface MutableNode {
+  name: string;
+  path: string;
+  type: 'folder' | 'file';
+  fileCount: number;
+  componentCount: number;
+  children: Map<string, MutableNode>;
+}
 
 /**
  * Aggregates repository insights for the dashboard. Totals come from the
- * denormalized counts on the repository; rankings and the folder breakdown are
- * computed from the component/file rows.
+ * denormalized counts; rankings and the folder *tree* are computed from the
+ * component/file rows.
  */
 export async function getDashboard(repositoryId: string): Promise<DashboardStats> {
   const repo = await repositoryRepository.findById(repositoryId);
@@ -47,20 +51,16 @@ export async function getDashboard(repositoryId: string): Promise<DashboardStats
     .slice(0, RANK_LIMIT)
     .map((c) => ({ name: c.name, filePath: c.file.path, value: c.importedByCount }));
 
-  // Folder breakdown: file + component counts grouped by immediate directory.
-  const folderMap = new Map<string, { fileCount: number; componentCount: number }>();
-  const bump = (path: string, key: 'fileCount' | 'componentCount'): void => {
-    const folder = dirOf(path);
-    const entry = folderMap.get(folder) ?? { fileCount: 0, componentCount: 0 };
-    entry[key] += 1;
-    folderMap.set(folder, entry);
-  };
-  for (const file of files) bump(file.path, 'fileCount');
-  for (const component of components) bump(component.file.path, 'componentCount');
+  // Components-per-file, so each file/folder node carries a component count.
+  const componentsByPath = new Map<string, number>();
+  for (const c of components) {
+    componentsByPath.set(c.file.path, (componentsByPath.get(c.file.path) ?? 0) + 1);
+  }
 
-  const folders: FolderSummary[] = [...folderMap.entries()]
-    .map(([path, counts]) => ({ path, ...counts }))
-    .sort((a, b) => b.fileCount - a.fileCount || a.path.localeCompare(b.path));
+  const { tree, folderCount } = buildTree(
+    files.map((f) => f.path),
+    componentsByPath,
+  );
 
   return {
     totalFiles: repo.fileCount,
@@ -68,8 +68,74 @@ export async function getDashboard(repositoryId: string): Promise<DashboardStats
     totalHooks: repo.hookCount,
     totalRoutes: repo.routeCount,
     totalLines: repo.totalLines,
+    totalFolders: folderCount,
     largestComponents,
     mostImportedComponents,
-    folders,
+    tree,
   };
+}
+
+/** Builds a nested folder tree from file paths, rolling up counts to ancestors. */
+function buildTree(
+  paths: string[],
+  componentsByPath: Map<string, number>,
+): { tree: FolderTreeNode[]; folderCount: number } {
+  const root = new Map<string, MutableNode>();
+  const folderPaths = new Set<string>();
+
+  for (const filePath of paths) {
+    const segments = filePath.split('/');
+    const componentCount = componentsByPath.get(filePath) ?? 0;
+    let level = root;
+    let currentPath = '';
+
+    segments.forEach((segment, index) => {
+      const isFile = index === segments.length - 1;
+      currentPath = currentPath ? `${currentPath}/${segment}` : segment;
+
+      let node = level.get(segment);
+      if (!node) {
+        node = {
+          name: segment,
+          path: currentPath,
+          type: isFile ? 'file' : 'folder',
+          fileCount: 0,
+          componentCount: 0,
+          children: new Map(),
+        };
+        level.set(segment, node);
+      }
+
+      if (isFile) {
+        node.fileCount = 1;
+        node.componentCount = componentCount;
+      } else {
+        node.fileCount += 1;
+        node.componentCount += componentCount;
+        folderPaths.add(currentPath);
+      }
+      level = node.children;
+    });
+  }
+
+  return { tree: convert(root), folderCount: folderPaths.size };
+}
+
+/** Converts the mutable map tree into sorted DTO nodes (folders first, then files). */
+function convert(level: Map<string, MutableNode>): FolderTreeNode[] {
+  return [...level.values()]
+    .map((node): FolderTreeNode => {
+      const base = {
+        name: node.name,
+        path: node.path,
+        type: node.type,
+        fileCount: node.fileCount,
+        componentCount: node.componentCount,
+      };
+      return node.type === 'folder' ? { ...base, children: convert(node.children) } : base;
+    })
+    .sort((a, b) => {
+      if (a.type !== b.type) return a.type === 'folder' ? -1 : 1;
+      return a.name.localeCompare(b.name);
+    });
 }

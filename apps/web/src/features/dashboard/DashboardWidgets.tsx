@@ -1,7 +1,6 @@
 import type { ReactNode } from 'react';
-import type { FolderSummary, RankedComponent } from '@arcloom/types';
-import { Card, CardContent, CardHeader, CardTitle, EmptyState } from '@/components/ui';
-import { cn } from '@/utils/cn';
+import type { RankedComponent } from '@arcloom/types';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui';
 
 const compact = new Intl.NumberFormat('en', { notation: 'compact' });
 
@@ -72,48 +71,6 @@ export function RankedList({
               </li>
             ))}
           </ul>
-        )}
-      </CardContent>
-    </Card>
-  );
-}
-
-/** Folder-structure overview with file / component counts. */
-export function FolderOverview({ folders }: { folders: FolderSummary[] }) {
-  const maxFiles = folders.reduce((m, f) => Math.max(m, f.fileCount), 0) || 1;
-
-  return (
-    <Card>
-      <CardHeader>
-        <CardTitle>Folder structure</CardTitle>
-      </CardHeader>
-      <CardContent>
-        {folders.length === 0 ? (
-          <EmptyState title="No folders" className="border-0 py-6" />
-        ) : (
-          <div className="max-h-80 space-y-2.5 overflow-y-auto pr-1">
-            {folders.map((folder) => (
-              <div key={folder.path} className="flex items-center gap-3">
-                <div className="min-w-0 flex-1">
-                  <div className="flex items-center justify-between gap-3">
-                    <span className="truncate font-mono text-xs text-foreground">
-                      {folder.path === '.' ? '/ (root)' : folder.path}
-                    </span>
-                    <span className="shrink-0 text-[11px] tabular-nums text-subtle">
-                      {folder.fileCount} file{folder.fileCount === 1 ? '' : 's'}
-                      {folder.componentCount > 0 && ` · ${folder.componentCount} comp`}
-                    </span>
-                  </div>
-                  <div className="mt-1 h-1 w-full overflow-hidden rounded-full bg-surface-raised">
-                    <div
-                      className={cn('h-full rounded-full bg-accent/60')}
-                      style={{ width: `${Math.max(3, (folder.fileCount / maxFiles) * 100)}%` }}
-                    />
-                  </div>
-                </div>
-              </div>
-            ))}
-          </div>
         )}
       </CardContent>
     </Card>

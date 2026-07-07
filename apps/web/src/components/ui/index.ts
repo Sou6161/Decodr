@@ -12,3 +12,5 @@ export { Skeleton } from './Skeleton';
 export { Spinner } from './Spinner';
 export { ProgressBar } from './ProgressBar';
 export { EmptyState, ErrorState } from './States';
+export { Toaster } from './Toaster';
+export { Dialog, ConfirmDialog } from './Dialog';

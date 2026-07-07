@@ -27,8 +27,18 @@ const EnvSchema = z.object({
     .default(AIProviderName.OpenAI),
   AI_MODEL: z.string().default('gpt-4o-mini'),
   OPENAI_API_KEY: z.string().optional().default(''),
-  /** Optional override for OpenAI-compatible gateways (e.g. api-hub.ai). */
+  /** Optional override for OpenAI-compatible gateways (e.g. OpenRouter). */
   OPENAI_BASE_URL: z.string().optional().default(''),
+  /** Attribution title sent to gateways like OpenRouter (X-Title header). */
+  AI_SITE_NAME: z.string().default('Arcloom'),
+  /**
+   * Enable reasoning on OpenRouter (`reasoning: { enabled: true }`). Useful with
+   * the `openrouter/free` router, which routes to reasoning-capable models.
+   */
+  AI_REASONING: z
+    .string()
+    .default('false')
+    .transform((v) => v.toLowerCase() === 'true'),
 });
 
 type Env = z.infer<typeof EnvSchema>;

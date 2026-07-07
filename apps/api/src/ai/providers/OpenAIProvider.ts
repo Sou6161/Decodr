@@ -13,12 +13,23 @@ export class OpenAIProvider implements AIProvider {
   readonly model: string;
   private readonly apiKey: string;
   private readonly baseURL: string | undefined;
+  private readonly headers: Record<string, string> | undefined;
+  private readonly reasoning: boolean;
   private client: OpenAI | null = null;
 
-  constructor(params: { apiKey: string; model: string; baseURL?: string }) {
+  constructor(params: {
+    apiKey: string;
+    model: string;
+    baseURL?: string;
+    headers?: Record<string, string>;
+    reasoning?: boolean;
+  }) {
     this.apiKey = params.apiKey;
     this.model = params.model;
     this.baseURL = params.baseURL && params.baseURL.length > 0 ? params.baseURL : undefined;
+    this.headers =
+      params.headers && Object.keys(params.headers).length > 0 ? params.headers : undefined;
+    this.reasoning = params.reasoning ?? false;
   }
 
   isConfigured(): boolean {
@@ -36,6 +47,7 @@ export class OpenAIProvider implements AIProvider {
     this.client ??= new OpenAI({
       apiKey: this.apiKey,
       ...(this.baseURL ? { baseURL: this.baseURL } : {}),
+      ...(this.headers ? { defaultHeaders: this.headers } : {}),
     });
     return this.client;
   }
@@ -43,13 +55,28 @@ export class OpenAIProvider implements AIProvider {
   async complete(request: CompletionRequest): Promise<CompletionResult> {
     const client = this.getClient();
     try {
-      const response = await client.chat.completions.create({
+      // `reasoning` is an OpenRouter extension not in the OpenAI SDK types, so
+      // the body is assembled loosely and cast; the SDK forwards it verbatim.
+      const body: Record<string, unknown> = {
         model: this.model,
         temperature: request.temperature ?? 0.2,
         max_tokens: request.maxTokens ?? 1024,
         messages: request.messages,
-      });
-      const text = response.choices[0]?.message?.content ?? '';
+        ...(this.reasoning ? { reasoning: { enabled: true } } : {}),
+      };
+
+      const response = (await client.chat.completions.create(
+        body as unknown as OpenAI.Chat.Completions.ChatCompletionCreateParamsNonStreaming,
+      )) as OpenAI.Chat.Completions.ChatCompletion;
+
+      const message = response.choices[0]?.message;
+      // Prefer the answer content; some reasoning models leave content empty and
+      // put the text under `reasoning`, so fall back to that.
+      let text = message?.content ?? '';
+      if (!text && message) {
+        const reasoning = (message as { reasoning?: unknown }).reasoning;
+        if (typeof reasoning === 'string') text = reasoning;
+      }
       return { text, model: response.model };
     } catch (err) {
       if (err instanceof OpenAI.APIError) {

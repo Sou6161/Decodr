@@ -1,6 +1,7 @@
 import { GraphEdgeKind } from '@prisma/client';
 import { analyzeRepository } from '../parser/analyzer.js';
 import { buildComponentEdges } from '../graph/graphBuilder.js';
+import { deriveFileBasedRoutes } from '../routing/fileRoutes.js';
 import { componentRepository } from '../repositories/componentRepository.js';
 import { hookRepository } from '../repositories/hookRepository.js';
 import { routeRepository } from '../repositories/routeRepository.js';
@@ -68,15 +69,34 @@ export async function analyzeAndPersist(
   if (componentRows.length) await componentRepository.createMany(componentRows);
   if (hookRows.length) await hookRepository.createMany(hookRows);
 
-  // 2. Routes.
-  const routeRows = parsed.flatMap((file) =>
+  // 2. Routes — React Router (from JSX/config) plus file-based conventions
+  //    (Expo Router / Next.js). The route file's default-export component names
+  //    each file-based route.
+  const defaultComponentByPath = new Map<string, string>();
+  for (const file of parsed) {
+    const def = file.components.find((c) => c.isDefaultExport);
+    if (def) defaultComponentByPath.set(file.path, def.name);
+  }
+
+  const reactRouterRows = parsed.flatMap((file) =>
     file.routes.map((r) => ({
-      repositoryId,
       path: r.path,
       componentName: r.componentName,
       filePath: file.path,
     })),
   );
+  const fileBasedRows = deriveFileBasedRoutes(files.map((f) => f.path)).map((r) => ({
+    path: r.routePath,
+    componentName: defaultComponentByPath.get(r.filePath) ?? null,
+    filePath: r.filePath,
+  }));
+
+  // Merge and dedupe by URL path (a project uses one routing system in practice).
+  const routesByPath = new Map<string, { path: string; componentName: string | null; filePath: string }>();
+  for (const row of [...reactRouterRows, ...fileBasedRows]) {
+    if (!routesByPath.has(row.path)) routesByPath.set(row.path, row);
+  }
+  const routeRows = [...routesByPath.values()].map((r) => ({ repositoryId, ...r }));
   if (routeRows.length) await routeRepository.createMany(routeRows);
 
   // 3. Edges — map component refs to persisted ids.

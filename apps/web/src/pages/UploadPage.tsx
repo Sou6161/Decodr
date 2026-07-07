@@ -4,10 +4,12 @@ import { Card } from '@/components/ui';
 import { GraphIcon, SearchIcon, SparkIcon } from '@/components/icons';
 import { Dropzone } from '@/features/upload/Dropzone';
 import { useUploadRepository } from '@/features/upload/hooks';
+import type { UploadSelection } from '@/features/upload/collectFiles';
 import { ApiClientError } from '@/services/apiClient';
+import { toast } from '@/stores/toastStore';
 
 const STEPS = [
-  { icon: <SearchIcon />, title: 'Scan', description: 'Files are extracted and indexed.' },
+  { icon: <SearchIcon />, title: 'Scan', description: 'Source files are read and indexed.' },
   { icon: <GraphIcon />, title: 'Map', description: 'Components and relationships are modeled.' },
   { icon: <SparkIcon />, title: 'Explain', description: 'Ask how any feature works.' },
 ];
@@ -16,9 +18,12 @@ export function UploadPage() {
   const navigate = useNavigate();
   const upload = useUploadRepository();
 
-  const handleFile = (file: File) => {
-    upload.mutate(file, {
-      onSuccess: ({ repository }) => navigate(`/repositories/${repository.id}`),
+  const handleSelect = (selection: UploadSelection) => {
+    upload.mutate(selection, {
+      onSuccess: ({ repository }) => {
+        toast.success('Upload received', `Analyzing "${repository.name}"…`);
+        navigate(`/repositories/${repository.id}`);
+      },
     });
   };
 
@@ -32,12 +37,12 @@ export function UploadPage() {
   return (
     <div>
       <PageHeader
-        title="Upload repository"
-        description="Drop a ZIP of a React + TypeScript project to map its architecture."
+        title="Upload project"
+        description="Pick a project folder — Arcloom reads only the source files and maps its structure."
       />
 
       <Dropzone
-        onFile={handleFile}
+        onSelect={handleSelect}
         isUploading={upload.isPending}
         error={errorMessage}
       />
