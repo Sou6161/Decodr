@@ -15,8 +15,8 @@ import { AppError } from '../utils/AppError.js';
 
 /** Thin HTTP layer: parse input, call a service, shape the response. */
 export const repositoryController = {
-  async list(_req: Request, res: Response): Promise<void> {
-    const repositories = await repositoryService.list();
+  async list(req: Request, res: Response): Promise<void> {
+    const repositories = await repositoryService.list(req.ownerToken);
     const body: ListRepositoriesResponse = { repositories };
     res.json(body);
   },
@@ -42,7 +42,7 @@ export const repositoryController = {
     if (!req.file) {
       throw AppError.badRequest('Attach a .zip file under the form field "file".');
     }
-    const repository = await uploadService.uploadAndProcess(req.file);
+    const repository = await uploadService.uploadAndProcess(req.file, req.ownerToken);
     const body: UploadRepositoryResponse = { repository };
     res.status(202).json(body);
   },
@@ -71,6 +71,7 @@ export const repositoryController = {
     const repository = await uploadService.uploadFolderAndProcess({
       name: String(req.body.name ?? 'project'),
       files: staged,
+      ownerToken: req.ownerToken,
     });
     const body: UploadRepositoryResponse = { repository };
     res.status(202).json(body);

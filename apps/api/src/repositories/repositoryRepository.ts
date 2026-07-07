@@ -14,8 +14,11 @@ export const repositoryRepository = {
     return prisma.repository.findUnique({ where: { id } });
   },
 
-  list(): Promise<RepositoryModel[]> {
-    return prisma.repository.findMany({ orderBy: { createdAt: 'desc' } });
+  list(ownerToken: string): Promise<RepositoryModel[]> {
+    return prisma.repository.findMany({
+      where: { ownerToken },
+      orderBy: { createdAt: 'desc' },
+    });
   },
 
   update(

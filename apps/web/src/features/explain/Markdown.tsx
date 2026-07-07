@@ -30,7 +30,7 @@ function renderBlocks(md: string): ReactNode[] {
       blocks.push(
         <pre
           key={key++}
-          className="overflow-x-auto rounded-lg border border-border-strong bg-[#0d0d12] p-3.5 font-mono text-[12.5px] leading-relaxed text-foreground/90 shadow-sm shadow-black/30"
+          className="overflow-x-auto rounded-lg border border-border-strong bg-[oklch(0.15_0.03_248)] p-3.5 font-mono text-[12.5px] leading-relaxed text-foreground/90 shadow-sm shadow-black/30"
         >
           <code>{code.join('\n')}</code>
         </pre>,

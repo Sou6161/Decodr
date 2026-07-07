@@ -3,28 +3,28 @@ import { repositoryController } from '../controllers/repositoryController.js';
 import { conversationController } from '../controllers/conversationController.js';
 import { asyncHandler } from '../middleware/errorHandler.js';
 import { uploadZip, uploadFolder } from '../middleware/upload.js';
+import { requireOwnedRepository } from '../middleware/owner.js';
 
-/**
- * /api/repositories
- *
- * The full contract is declared here. Handlers for later phases throw a
- * 501 until implemented, keeping the surface visible and stable.
- */
+/** /api/repositories — every `/:id` route is gated to the caller's session. */
 export const repositoryRouter: Router = Router();
 
+// Collection routes (scoped to the caller by owner token, not by :id).
 repositoryRouter.get('/', asyncHandler(repositoryController.list));
 repositoryRouter.post('/', uploadZip, asyncHandler(repositoryController.upload));
 repositoryRouter.post('/folder', uploadFolder, asyncHandler(repositoryController.uploadFolder));
 
-repositoryRouter.get('/:id', asyncHandler(repositoryController.detail));
-repositoryRouter.delete('/:id', asyncHandler(repositoryController.remove));
-repositoryRouter.get('/:id/progress', asyncHandler(repositoryController.progress));
-repositoryRouter.get('/:id/components', asyncHandler(repositoryController.entities));
-repositoryRouter.get('/:id/graph', asyncHandler(repositoryController.graph));
-repositoryRouter.get('/:id/dashboard', asyncHandler(repositoryController.dashboard));
+// Everything addressed by :id must belong to the caller's session.
+const owned = asyncHandler(requireOwnedRepository);
+
+repositoryRouter.get('/:id', owned, asyncHandler(repositoryController.detail));
+repositoryRouter.delete('/:id', owned, asyncHandler(repositoryController.remove));
+repositoryRouter.get('/:id/progress', owned, asyncHandler(repositoryController.progress));
+repositoryRouter.get('/:id/components', owned, asyncHandler(repositoryController.entities));
+repositoryRouter.get('/:id/graph', owned, asyncHandler(repositoryController.graph));
+repositoryRouter.get('/:id/dashboard', owned, asyncHandler(repositoryController.dashboard));
 
 // Persistent explanation conversations
-repositoryRouter.get('/:id/conversations', asyncHandler(conversationController.list));
-repositoryRouter.post('/:id/conversations/ask', asyncHandler(conversationController.ask));
-repositoryRouter.get('/:id/conversations/:cid', asyncHandler(conversationController.detail));
-repositoryRouter.delete('/:id/conversations/:cid', asyncHandler(conversationController.remove));
+repositoryRouter.get('/:id/conversations', owned, asyncHandler(conversationController.list));
+repositoryRouter.post('/:id/conversations/ask', owned, asyncHandler(conversationController.ask));
+repositoryRouter.get('/:id/conversations/:cid', owned, asyncHandler(conversationController.detail));
+repositoryRouter.delete('/:id/conversations/:cid', owned, asyncHandler(conversationController.remove));

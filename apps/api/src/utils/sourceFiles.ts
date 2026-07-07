@@ -31,6 +31,9 @@ export const IGNORED_DIRECTORIES = new Set([
   '.idea',
   '.vscode',
   '__pycache__',
+  // Arcloom's own runtime dirs (so analyzing Arcloom doesn't scan uploaded repos).
+  'storage',
+  '_uploads',
 ]);
 
 /** True if the file extension is one Arcloom treats as source code. */

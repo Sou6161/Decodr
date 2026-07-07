@@ -28,6 +28,8 @@ async function request<T>(path: string, options: RequestOptions = {}): Promise<T
 
   const response = await fetch(`${BASE_URL}/api${path}`, {
     ...rest,
+    // Send the session cookie so the server can scope data to this visitor.
+    credentials: 'include',
     headers: {
       ...(isFormData ? {} : body ? { 'Content-Type': 'application/json' } : {}),
       ...headers,

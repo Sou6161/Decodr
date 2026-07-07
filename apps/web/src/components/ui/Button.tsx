@@ -4,13 +4,15 @@ import { cn } from '@/utils/cn';
 type Variant = 'primary' | 'secondary' | 'ghost' | 'danger';
 type Size = 'sm' | 'md' | 'lg';
 
+// Chunky "pop" buttons: a solid bottom edge that presses down on click.
 const VARIANTS: Record<Variant, string> = {
   primary:
-    'bg-primary text-primary-foreground hover:bg-primary/90 shadow-sm shadow-primary/30',
+    'bg-primary text-primary-foreground shadow-[0_4px_0_0_var(--color-primary-soft)] hover:brightness-110 active:translate-y-[3px] active:shadow-[0_1px_0_0_var(--color-primary-soft)]',
   secondary:
-    'bg-surface-raised text-foreground border border-border hover:border-border-strong hover:bg-overlay',
+    'bg-surface-raised text-foreground border-2 border-border-strong shadow-[0_4px_0_0_var(--color-border)] hover:brightness-110 active:translate-y-[3px] active:shadow-[0_1px_0_0_var(--color-border)]',
   ghost: 'text-muted hover:text-foreground hover:bg-surface-raised',
-  danger: 'bg-danger/90 text-white hover:bg-danger',
+  danger:
+    'bg-danger text-white shadow-[0_4px_0_0_var(--color-danger-soft)] hover:brightness-110 active:translate-y-[3px] active:shadow-[0_1px_0_0_var(--color-danger-soft)]',
 };
 
 const SIZES: Record<Size, string> = {

@@ -2,6 +2,7 @@ import { lazy } from 'react';
 import { createBrowserRouter } from 'react-router-dom';
 import { AppShell } from '@/layouts/AppShell';
 import { RepositoryLayout } from '@/layouts/RepositoryLayout';
+import { LandingPage } from '@/pages/LandingPage';
 import { RepositoriesPage } from '@/pages/RepositoriesPage';
 import { UploadPage } from '@/pages/UploadPage';
 import { DashboardPage } from '@/pages/repository/DashboardPage';
@@ -14,10 +15,11 @@ const GraphPage = lazy(() =>
 );
 
 export const router = createBrowserRouter([
+  { path: '/', element: <LandingPage /> },
   {
     element: <AppShell />,
     children: [
-      { path: '/', element: <RepositoriesPage /> },
+      { path: '/app', element: <RepositoriesPage /> },
       { path: '/upload', element: <UploadPage /> },
       {
         path: '/repositories/:id',

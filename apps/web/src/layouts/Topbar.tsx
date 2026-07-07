@@ -17,7 +17,7 @@ export function Topbar() {
         <MenuIcon />
       </button>
 
-      <Link to="/" className="flex items-center gap-2 lg:hidden">
+      <Link to="/app" className="flex items-center gap-2 lg:hidden">
         <Logo />
         <span className="font-semibold">Arcloom</span>
       </Link>

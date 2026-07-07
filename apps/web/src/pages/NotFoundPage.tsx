@@ -10,8 +10,8 @@ export function NotFoundPage() {
       <p className="mt-1.5 text-sm text-muted">
         The page you're looking for doesn't exist.
       </p>
-      <Button className="mt-6" onClick={() => navigate('/')}>
-        Back to repositories
+      <Button className="mt-6" onClick={() => navigate('/app')}>
+        Back to projects
       </Button>
     </div>
   );

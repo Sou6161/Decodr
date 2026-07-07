@@ -33,8 +33,8 @@ const STATUS_PROGRESS: Record<RepositoryStatus, { percent: number; message: stri
 };
 
 export const repositoryService = {
-  async list(): Promise<Repository[]> {
-    const rows = await repositoryRepository.list();
+  async list(ownerToken: string): Promise<Repository[]> {
+    const rows = await repositoryRepository.list(ownerToken);
     return rows.map(toRepositoryDto);
   },
 

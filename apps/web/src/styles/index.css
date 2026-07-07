@@ -1,42 +1,43 @@
 @import 'tailwindcss';
 
 /*
- * Arcloom design tokens (Tailwind v4 CSS-first config).
- * Dark, minimal, premium — inspired by GitHub / Linear / Vercel.
- * Each token here generates utilities (e.g. --color-surface → bg-surface).
+ * Arcloom — "anime twilight" theme.
+ * A soft anime dusk sky as the backdrop (stars, moon, drifting sakura), with
+ * FLAT cel-shaded colors on top (no gradients on UI) and chunky, playful shapes.
  */
 @theme {
-  /* Surfaces */
-  --color-background: oklch(0.16 0.006 285);
-  --color-surface: oklch(0.19 0.007 285);
-  --color-surface-raised: oklch(0.225 0.008 285);
-  --color-overlay: oklch(0.21 0.008 285);
+  /* Panel surfaces — deep moonlit navy, kept fairly opaque so text stays crisp */
+  --color-background: oklch(0.19 0.03 245);
+  --color-surface: oklch(0.235 0.035 244);
+  --color-surface-raised: oklch(0.285 0.04 242);
+  --color-overlay: oklch(0.265 0.04 242);
 
-  /* Borders & lines */
-  --color-border: oklch(0.28 0.008 285);
-  --color-border-strong: oklch(0.36 0.01 285);
+  /* Bold, crisp outlines (anime linework) */
+  --color-border: oklch(0.37 0.035 240);
+  --color-border-strong: oklch(0.5 0.05 232);
 
   /* Text */
-  --color-foreground: oklch(0.96 0.003 285);
-  --color-muted: oklch(0.72 0.006 285);
-  --color-subtle: oklch(0.56 0.006 285);
+  --color-foreground: oklch(0.98 0.01 220);
+  --color-muted: oklch(0.8 0.02 220);
+  --color-subtle: oklch(0.63 0.03 225);
 
-  /* Brand */
-  --color-primary: oklch(0.62 0.19 277);
-  --color-primary-foreground: oklch(0.98 0.01 277);
-  --color-primary-soft: oklch(0.4 0.12 277);
-  --color-accent: oklch(0.78 0.13 200);
+  /* Flat vibrant accents — cool cyan + warm gold, no pink/violet */
+  --color-primary: oklch(0.75 0.14 214); /* sky cyan */
+  --color-primary-foreground: oklch(0.15 0.03 240);
+  --color-primary-soft: oklch(0.52 0.12 216); /* darker edge for 3D buttons */
+  --color-accent: oklch(0.84 0.14 84); /* warm gold */
+  --color-accent-soft: oklch(0.58 0.12 74);
+  --color-sky: oklch(0.8 0.12 200); /* teal-cyan */
+  --color-gold: oklch(0.87 0.14 88); /* moon / sparkle */
 
-  /* Status */
-  --color-success: oklch(0.74 0.16 152);
-  --color-warning: oklch(0.8 0.15 85);
-  --color-danger: oklch(0.66 0.21 25);
+  --color-success: oklch(0.8 0.15 162); /* emerald */
+  --color-warning: oklch(0.86 0.14 86);
+  --color-danger: oklch(0.7 0.17 25);
+  --color-danger-soft: oklch(0.5 0.15 25);
 
-  /* Radii */
   --radius-xl: 1rem;
   --radius-2xl: 1.25rem;
 
-  /* Fonts */
   --font-sans:
     'Inter', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', sans-serif;
   --font-mono:
@@ -55,30 +56,38 @@
 
   body {
     margin: 0;
-    background-color: var(--color-background);
     color: var(--color-foreground);
     font-family: var(--font-sans);
     -webkit-font-smoothing: antialiased;
     text-rendering: optimizeLegibility;
   }
 
-  /* Subtle ambient gradient backdrop for the app shell. */
+  /* The anime night sky: near-black navy up top, deepening to a moonlit teal
+   * glow over the horizon. Cool, calm, no warm/pink tones. */
   body::before {
     content: '';
     position: fixed;
     inset: 0;
-    z-index: -1;
-    background:
-      radial-gradient(
-        60rem 40rem at 80% -10%,
-        oklch(0.62 0.19 277 / 0.08),
-        transparent 70%
-      ),
-      radial-gradient(
-        50rem 30rem at 0% 0%,
-        oklch(0.78 0.13 200 / 0.05),
-        transparent 60%
-      );
+    z-index: -30;
+    background: linear-gradient(
+      180deg,
+      oklch(0.13 0.03 255) 0%,
+      oklch(0.17 0.04 245) 38%,
+      oklch(0.21 0.05 220) 72%,
+      oklch(0.25 0.06 200) 100%
+    );
+  }
+
+  /* Fine grain for a hand-painted feel. */
+  body::after {
+    content: '';
+    position: fixed;
+    inset: 0;
+    z-index: -29;
+    pointer-events: none;
+    opacity: 0.04;
+    mix-blend-mode: overlay;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='140' height='140'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
   }
 
   ::selection {
@@ -86,7 +95,6 @@
     color: var(--color-foreground);
   }
 
-  /* Minimal custom scrollbars. */
   ::-webkit-scrollbar {
     width: 10px;
     height: 10px;
@@ -99,12 +107,48 @@
   ::-webkit-scrollbar-thumb:hover {
     background: var(--color-subtle);
   }
+
+  /* Glowing light motes / fireflies drifting down. */
+  @keyframes mote-drift {
+    0% {
+      transform: translateY(-8vh) translateX(0);
+      opacity: 0;
+    }
+    12% {
+      opacity: 0.85;
+    }
+    88% {
+      opacity: 0.85;
+    }
+    100% {
+      transform: translateY(108vh) translateX(var(--drift, 40px));
+      opacity: 0;
+    }
+  }
+
+  @keyframes twinkle {
+    0%,
+    100% {
+      opacity: 0.25;
+    }
+    50% {
+      opacity: 1;
+    }
+  }
 }
 
 @layer utilities {
-  /* Frosted card surface used across the dashboard. */
+  /* Frosted panel over the sky. */
   .glass {
-    background: color-mix(in oklch, var(--color-surface) 80%, transparent);
-    backdrop-filter: blur(12px);
+    background: color-mix(in oklch, var(--color-surface) 78%, transparent);
+    backdrop-filter: blur(14px);
+  }
+
+  /* Cel-shaded sticker shadow — a solid offset drop, no blur. */
+  .pop {
+    box-shadow: 0.4rem 0.4rem 0 0 oklch(0.11 0.03 250 / 0.9);
+  }
+  .pop-sm {
+    box-shadow: 0.25rem 0.25rem 0 0 oklch(0.11 0.03 250 / 0.85);
   }
 }

@@ -25,7 +25,7 @@ interface NavItem {
 }
 
 const WORKSPACE_NAV: NavItem[] = [
-  { to: '/', label: 'Projects', icon: DashboardIcon, end: true },
+  { to: '/app', label: 'Projects', icon: DashboardIcon, end: true },
   { to: '/upload', label: 'Upload', icon: UploadIcon },
 ];
 
@@ -43,7 +43,7 @@ export function Sidebar({ onNavigate }: { onNavigate?: () => void }) {
 
   return (
     <div className="flex h-full flex-col p-4">
-      <NavLink to="/" onClick={onNavigate} className="mb-6 flex items-center gap-2.5 px-2">
+      <NavLink to="/app" onClick={onNavigate} className="mb-6 flex items-center gap-2.5 px-2">
         <Logo />
         <span className="text-base font-semibold tracking-tight">Arcloom</span>
       </NavLink>

@@ -39,7 +39,7 @@ export function RepositoryLayout() {
   // no scary error screen.
   const notFound = error instanceof ApiClientError && error.status === 404;
   useEffect(() => {
-    if (notFound) navigate('/', { replace: true });
+    if (notFound) navigate('/app', { replace: true });
   }, [notFound, navigate]);
 
   useEffect(() => {
@@ -107,7 +107,7 @@ export function RepositoryLayout() {
         destructive
         loading={del.isPending}
         onConfirm={() =>
-          del.mutate(repo.id, { onSuccess: () => navigate('/', { replace: true }) })
+          del.mutate(repo.id, { onSuccess: () => navigate('/app', { replace: true }) })
         }
         onClose={() => setConfirmOpen(false)}
       />

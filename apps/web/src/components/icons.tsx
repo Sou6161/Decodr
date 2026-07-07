@@ -120,16 +120,35 @@ export const CompressIcon = (p: IconProps) => (
   </Base>
 );
 
-/** Arcloom logomark — concentric node graph. */
+/**
+ * Arcloom logomark — a woven "loom": warp + weft threads crossing (over/under)
+ * inside a diamond frame, with nodes at the joins. Weaving a codebase's threads
+ * into structure.
+ */
 export function Logo({ className }: { className?: string }) {
   return (
     <svg className={className} width="28" height="28" viewBox="0 0 32 32" fill="none" aria-hidden="true">
-      <rect width="32" height="32" rx="8" fill="oklch(0.19 0.007 285)" />
-      <circle cx="16" cy="16" r="3.5" fill="var(--color-primary)" />
-      <circle cx="16" cy="16" r="9" stroke="var(--color-primary)" strokeWidth="1.4" opacity="0.55" />
-      <circle cx="25" cy="16" r="1.8" fill="var(--color-accent)" />
-      <circle cx="7" cy="16" r="1.8" fill="var(--color-accent)" />
-      <circle cx="16" cy="7" r="1.8" fill="var(--color-accent)" />
+      <rect width="32" height="32" rx="9" fill="var(--color-surface-raised)" />
+      {/* diamond frame */}
+      <path
+        d="M16 5 L27 16 L16 27 L5 16 Z"
+        fill="none"
+        stroke="var(--color-primary)"
+        strokeWidth="2"
+        strokeLinejoin="round"
+      />
+      {/* weft thread (over) */}
+      <path d="M5 16 H27" stroke="var(--color-primary)" strokeWidth="2" strokeLinecap="round" />
+      {/* warp thread (under — gapped where the weft crosses) */}
+      <path d="M16 5 V12" stroke="var(--color-primary)" strokeWidth="2" strokeLinecap="round" />
+      <path d="M16 20 V27" stroke="var(--color-primary)" strokeWidth="2" strokeLinecap="round" />
+      {/* corner nodes */}
+      <circle cx="16" cy="5" r="1.7" fill="var(--color-primary)" />
+      <circle cx="27" cy="16" r="1.7" fill="var(--color-primary)" />
+      <circle cx="16" cy="27" r="1.7" fill="var(--color-primary)" />
+      <circle cx="5" cy="16" r="1.7" fill="var(--color-primary)" />
+      {/* the loom's knot */}
+      <circle cx="16" cy="16" r="2.7" fill="var(--color-gold)" />
     </svg>
   );
 }

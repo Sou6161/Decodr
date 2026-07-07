@@ -17,7 +17,10 @@ export const uploadService = {
    * Persists a repository for an uploaded ZIP and kicks off processing in the
    * background. Returns immediately so the client can poll for progress.
    */
-  async uploadAndProcess(file: Express.Multer.File): Promise<Repository> {
+  async uploadAndProcess(
+    file: Express.Multer.File,
+    ownerToken: string,
+  ): Promise<Repository> {
     // Disk storage populates `path`; guard against an empty/missing upload.
     if (!file?.path) {
       throw AppError.badRequest('No file was uploaded under field "file".');
@@ -25,6 +28,7 @@ export const uploadService = {
 
     const repo = await repositoryRepository.create({
       name: cleanName(file.originalname),
+      ownerToken,
       status: RepositoryStatus.Pending,
       // Replaced with the detected project root once scanning completes.
       storagePath: 'pending',
@@ -44,6 +48,7 @@ export const uploadService = {
   async uploadFolderAndProcess(params: {
     name: string;
     files: StagedFile[];
+    ownerToken: string;
   }): Promise<Repository> {
     if (params.files.length === 0) {
       throw AppError.badRequest('No source files were found in that folder.');
@@ -51,6 +56,7 @@ export const uploadService = {
 
     const repo = await repositoryRepository.create({
       name: cleanName(params.name),
+      ownerToken: params.ownerToken,
       status: RepositoryStatus.Pending,
       storagePath: 'pending',
     });

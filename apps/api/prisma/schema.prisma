@@ -43,6 +43,9 @@ model Repository {
   status RepositoryStatus @default(PENDING)
   error  String?
 
+  /// Session token of the visitor who owns this project (privacy isolation).
+  ownerToken String @default("")
+
   /// Absolute path on disk where the extracted project lives.
   storagePath String
 
@@ -64,6 +67,7 @@ model Repository {
   updatedAt DateTime @updatedAt
 
   @@index([status])
+  @@index([ownerToken])
 }
 
 model File {
