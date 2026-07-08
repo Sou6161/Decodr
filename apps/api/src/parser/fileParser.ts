@@ -1,5 +1,5 @@
 import ts from 'typescript';
-import { ExportKind } from '@arcloom/types';
+import { ExportKind } from '@decodr/types';
 import type {
   ParsedComponent,
   ParsedFile,

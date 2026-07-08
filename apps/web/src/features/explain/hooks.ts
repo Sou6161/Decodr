@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import type { ConversationWithMessages } from '@arcloom/types';
+import type { ConversationWithMessages } from '@decodr/types';
 import { conversationKeys, explainApi } from './api';
 import { toast } from '@/stores/toastStore';
 import { ApiClientError } from '@/services/apiClient';

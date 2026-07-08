@@ -1,4 +1,4 @@
-import type { UploadRepositoryResponse } from '@arcloom/types';
+import type { UploadRepositoryResponse } from '@decodr/types';
 import { apiClient } from '@/services/apiClient';
 import type { PickedFile } from './collectFiles';
 

@@ -19,7 +19,7 @@ export function Topbar() {
 
       <Link to="/app" className="flex items-center gap-2 lg:hidden">
         <Logo />
-        <span className="font-semibold">Arcloom</span>
+        <span className="font-semibold">Decodr</span>
       </Link>
 
       <div className="ml-auto flex items-center gap-2">

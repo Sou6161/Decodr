@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { RepositoryStatus } from '@arcloom/types';
+import { RepositoryStatus } from '@decodr/types';
 import { repositoriesApi, repositoryKeys } from './api';
 import { toast } from '@/stores/toastStore';
 import { ApiClientError } from '@/services/apiClient';

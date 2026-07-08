@@ -1,6 +1,6 @@
 import { memo } from 'react';
 import { Handle, Position, type NodeProps } from '@xyflow/react';
-import { ExportKind } from '@arcloom/types';
+import { ExportKind } from '@decodr/types';
 import { cn } from '@/utils/cn';
 import type { ComponentFlowNode } from './layout';
 

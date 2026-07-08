@@ -1,6 +1,6 @@
 import { useState, type MouseEvent } from 'react';
 import { Link } from 'react-router-dom';
-import type { Repository } from '@arcloom/types';
+import type { Repository } from '@decodr/types';
 import { Badge, Card, ConfirmDialog } from '@/components/ui';
 import { ArrowRightIcon, TrashIcon } from '@/components/icons';
 import { STATUS_META } from './statusMeta';

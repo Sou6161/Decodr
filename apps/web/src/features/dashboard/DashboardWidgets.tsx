@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react';
-import type { RankedComponent } from '@arcloom/types';
+import type { RankedComponent } from '@decodr/types';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui';
 
 const compact = new Intl.NumberFormat('en', { notation: 'compact' });

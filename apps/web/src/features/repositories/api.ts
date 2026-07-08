@@ -2,7 +2,7 @@ import type {
   ListRepositoriesResponse,
   RepositoryDetailResponse,
   RepositoryProgressResponse,
-} from '@arcloom/types';
+} from '@decodr/types';
 import { apiClient } from '@/services/apiClient';
 
 /** Repository feature API calls. One module per feature keeps endpoints discoverable. */

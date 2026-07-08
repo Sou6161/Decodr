@@ -8,7 +8,7 @@ async function main(): Promise<void> {
 
   const app = createApp();
   const server = app.listen(env.API_PORT, () => {
-    logger.info(`Arcloom API listening on http://localhost:${env.API_PORT}`);
+    logger.info(`Decodr API listening on http://localhost:${env.API_PORT}`);
   });
 
   const shutdown = async (signal: string): Promise<void> => {

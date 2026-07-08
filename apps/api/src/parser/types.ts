@@ -1,4 +1,4 @@
-import type { ExportKind } from '@arcloom/types';
+import type { ExportKind } from '@decodr/types';
 
 /** A single imported binding, e.g. `{ UserCard }` or `default as App`. */
 export interface ParsedImportName {

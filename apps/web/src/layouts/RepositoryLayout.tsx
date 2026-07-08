@@ -1,7 +1,7 @@
 import { Suspense, useEffect, useState } from 'react';
 import { Outlet, useNavigate, useParams } from 'react-router-dom';
 import { useQueryClient } from '@tanstack/react-query';
-import { RepositoryStatus } from '@arcloom/types';
+import { RepositoryStatus } from '@decodr/types';
 import { PageHeader } from '@/components/PageHeader';
 import { Badge, ConfirmDialog, ErrorState, Skeleton } from '@/components/ui';
 import { TrashIcon } from '@/components/icons';

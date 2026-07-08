@@ -1,5 +1,5 @@
-import type { RepositoryProgress } from '@arcloom/types';
-import { RepositoryStatus } from '@arcloom/types';
+import type { RepositoryProgress } from '@decodr/types';
+import { RepositoryStatus } from '@decodr/types';
 import { Card, ProgressBar, Spinner } from '@/components/ui';
 import { cn } from '@/utils/cn';
 

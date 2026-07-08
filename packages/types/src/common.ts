@@ -1,5 +1,5 @@
 /**
- * Primitive shared aliases used across the Arcloom API surface.
+ * Primitive shared aliases used across the Decodr API surface.
  */
 
 /** ISO-8601 timestamp string (e.g. "2026-06-30T12:00:00.000Z"). */

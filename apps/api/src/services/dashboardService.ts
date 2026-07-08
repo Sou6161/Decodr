@@ -2,7 +2,7 @@ import type {
   DashboardStats,
   FolderTreeNode,
   RankedComponent,
-} from '@arcloom/types';
+} from '@decodr/types';
 import { repositoryRepository } from '../repositories/repositoryRepository.js';
 import { fileRepository } from '../repositories/fileRepository.js';
 import { componentRepository } from '../repositories/componentRepository.js';

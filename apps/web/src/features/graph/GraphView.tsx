@@ -11,7 +11,7 @@ import {
 } from '@xyflow/react';
 import { AnimatePresence } from 'framer-motion';
 import '@xyflow/react/dist/style.css';
-import type { RepositoryGraph } from '@arcloom/types';
+import type { RepositoryGraph } from '@decodr/types';
 import { CompressIcon, ExpandIcon, SearchIcon } from '@/components/icons';
 import { cn } from '@/utils/cn';
 import { ComponentNode } from './ComponentNode';

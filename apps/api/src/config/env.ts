@@ -2,7 +2,7 @@ import { config as loadDotenv } from 'dotenv';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { z } from 'zod';
-import { AIProviderName } from '@arcloom/types';
+import { AIProviderName } from '@decodr/types';
 
 // Load the repo-root .env (two levels up from apps/api) so a single file
 // configures the whole monorepo.
@@ -15,6 +15,8 @@ const EnvSchema = z.object({
     .enum(['development', 'test', 'production'])
     .default('development'),
   API_PORT: z.coerce.number().int().positive().default(4000),
+  // Hosting platforms (Render, etc.) inject PORT; prefer it when present.
+  PORT: z.coerce.number().int().positive().optional(),
   WEB_ORIGIN: z.string().default('http://localhost:5173'),
 
   DATABASE_URL: z.string().min(1, 'DATABASE_URL is required'),
@@ -30,7 +32,7 @@ const EnvSchema = z.object({
   /** Optional override for OpenAI-compatible gateways (e.g. OpenRouter). */
   OPENAI_BASE_URL: z.string().optional().default(''),
   /** Attribution title sent to gateways like OpenRouter (X-Title header). */
-  AI_SITE_NAME: z.string().default('Arcloom'),
+  AI_SITE_NAME: z.string().default('Decodr'),
   /**
    * Enable reasoning on OpenRouter (`reasoning: { enabled: true }`). Useful with
    * the `openrouter/free` router, which routes to reasoning-capable models.

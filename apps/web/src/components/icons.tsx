@@ -121,7 +121,7 @@ export const CompressIcon = (p: IconProps) => (
 );
 
 /**
- * Arcloom logomark — a woven "loom": warp + weft threads crossing (over/under)
+ * Decodr logomark — a woven "loom": warp + weft threads crossing (over/under)
  * inside a diamond frame, with nodes at the joins. Weaving a codebase's threads
  * into structure.
  */

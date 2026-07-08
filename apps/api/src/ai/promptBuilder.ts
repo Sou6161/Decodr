@@ -1,5 +1,5 @@
 import path from 'node:path';
-import type { ExplanationContext } from '@arcloom/types';
+import type { ExplanationContext } from '@decodr/types';
 import type { ChatMessage } from './types.js';
 
 /**

@@ -1,5 +1,5 @@
-import type { RepositoryGraph } from '@arcloom/types';
-import { GraphNodeKind } from '@arcloom/types';
+import type { RepositoryGraph } from '@decodr/types';
+import { GraphNodeKind } from '@decodr/types';
 import { componentRepository } from '../repositories/componentRepository.js';
 import { edgeRepository } from '../repositories/edgeRepository.js';
 

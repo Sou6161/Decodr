@@ -4,7 +4,7 @@ import type {
   AskResponse,
   ConversationResponse,
   ListConversationsResponse,
-} from '@arcloom/types';
+} from '@decodr/types';
 import { conversationService } from '../services/conversationService.js';
 import { AppError } from '../utils/AppError.js';
 

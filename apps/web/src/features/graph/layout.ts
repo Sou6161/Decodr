@@ -1,6 +1,6 @@
 import dagre from '@dagrejs/dagre';
 import { MarkerType, Position, type Edge, type Node } from '@xyflow/react';
-import type { GraphNodeData, RepositoryGraph } from '@arcloom/types';
+import type { GraphNodeData, RepositoryGraph } from '@decodr/types';
 
 /**
  * React Flow requires node data to satisfy Record<string, unknown> (a mapped

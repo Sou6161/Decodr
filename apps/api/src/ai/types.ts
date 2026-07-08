@@ -1,4 +1,4 @@
-import type { AIProviderName } from '@arcloom/types';
+import type { AIProviderName } from '@decodr/types';
 
 export interface ChatMessage {
   role: 'system' | 'user' | 'assistant';

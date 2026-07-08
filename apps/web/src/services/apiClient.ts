@@ -1,4 +1,4 @@
-import type { ApiError } from '@arcloom/types';
+import type { ApiError } from '@decodr/types';
 
 /**
  * In dev, Vite proxies "/api" to the backend, so a relative base works.

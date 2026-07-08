@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import type { FolderTreeNode } from '@arcloom/types';
+import type { FolderTreeNode } from '@decodr/types';
 import {
   ChevronRightIcon,
   FileIcon,

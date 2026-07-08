@@ -1,5 +1,5 @@
 import type { Repository as RepositoryModel } from '@prisma/client';
-import type { Repository } from '@arcloom/types';
+import type { Repository } from '@decodr/types';
 
 /** Maps a Prisma Repository row to the client-facing Repository DTO. */
 export function toRepositoryDto(model: RepositoryModel): Repository {

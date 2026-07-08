@@ -45,7 +45,7 @@ export function Sidebar({ onNavigate }: { onNavigate?: () => void }) {
     <div className="flex h-full flex-col p-4">
       <NavLink to="/app" onClick={onNavigate} className="mb-6 flex items-center gap-2.5 px-2">
         <Logo />
-        <span className="text-base font-semibold tracking-tight">Arcloom</span>
+        <span className="text-base font-semibold tracking-tight">Decodr</span>
       </NavLink>
 
       <p className="px-3 pb-1 text-[11px] font-medium uppercase tracking-wider text-subtle">

@@ -1,4 +1,4 @@
-import type { ApiError } from '@arcloom/types';
+import type { ApiError } from '@decodr/types';
 
 /**
  * Application-level error carrying an HTTP status, a stable machine code, and a

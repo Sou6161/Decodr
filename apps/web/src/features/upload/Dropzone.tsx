@@ -111,7 +111,7 @@ export function Dropzone({ onSelect, isUploading, error }: DropzoneProps) {
         </h3>
         <p className="mt-1.5 max-w-md text-sm text-muted">
           {isUploading
-            ? 'Sending your source files to Arcloom.'
+            ? 'Sending your source files to Decodr.'
             : 'Drag a folder, or click to choose one. Only source files are read — node_modules, builds, and .git are skipped automatically.'}
         </p>
 

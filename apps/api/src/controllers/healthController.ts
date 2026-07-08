@@ -11,7 +11,7 @@ export async function healthController(_req: Request, res: Response): Promise<vo
   }
   res.json({
     status: database === 'up' ? 'ok' : 'degraded',
-    service: 'arcloom-api',
+    service: 'decodr-api',
     database,
     timestamp: new Date().toISOString(),
   });

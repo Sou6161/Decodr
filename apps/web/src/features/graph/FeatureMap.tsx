@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react';
 import { motion } from 'framer-motion';
-import type { RepositoryGraph } from '@arcloom/types';
+import type { RepositoryGraph } from '@decodr/types';
 import { cn } from '@/utils/cn';
 import { colorForKey, featureLabel, featureOf, tint } from './colors';
 import { fadeUpItem, staggerContainer } from '@/utils/motion';

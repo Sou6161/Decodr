@@ -1,4 +1,4 @@
-import type { RepositoryGraphResponse } from '@arcloom/types';
+import type { RepositoryGraphResponse } from '@decodr/types';
 import { apiClient } from '@/services/apiClient';
 
 export const graphApi = {

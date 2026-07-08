@@ -1,4 +1,4 @@
-import type { RepositoryDashboardResponse } from '@arcloom/types';
+import type { RepositoryDashboardResponse } from '@decodr/types';
 import { apiClient } from '@/services/apiClient';
 
 export const dashboardApi = {

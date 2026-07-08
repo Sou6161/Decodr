@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState, type FormEvent } from 'react';
 import { useOutletContext, useSearchParams } from 'react-router-dom';
 import { AnimatePresence, motion } from 'framer-motion';
-import type { Repository } from '@arcloom/types';
+import type { Repository } from '@decodr/types';
 import { Button, Card, Spinner } from '@/components/ui';
 import { SparkIcon } from '@/components/icons';
 import { useRepositoryGraph } from '@/features/graph/hooks';
@@ -19,14 +19,14 @@ export function ExplainPage() {
 
   const [input, setInput] = useState('');
   const [mode, setMode] = useState<Mode>(
-    () => (localStorage.getItem('arcloom.explainMode') as Mode | null) ?? 'detailed',
+    () => (localStorage.getItem('decodr.explainMode') as Mode | null) ?? 'detailed',
   );
   const pendingQuestion = useRef('');
   const scrollAnchor = useRef<HTMLDivElement>(null);
 
   const setModePersisted = (m: Mode) => {
     setMode(m);
-    localStorage.setItem('arcloom.explainMode', m);
+    localStorage.setItem('decodr.explainMode', m);
   };
 
   const active = useConversation(repo.id, activeId);
@@ -72,7 +72,7 @@ export function ExplainPage() {
               <h3 className="text-sm font-semibold text-foreground">Ask about the architecture</h3>
             </div>
             <p className="mt-1.5 text-sm text-muted">
-              Arcloom finds the components and files your question is about and explains just
+              Decodr finds the components and files your question is about and explains just
               that part — it never reads the whole repo at once. Chats are saved in the sidebar.
             </p>
             <div className="mt-4 flex flex-wrap gap-2">

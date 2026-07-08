@@ -1,6 +1,6 @@
 import path from 'node:path';
 
-/** Source-code extensions Arcloom counts and (later) parses. */
+/** Source-code extensions Decodr counts and (later) parses. */
 export const SOURCE_EXTENSIONS = new Set([
   '.ts',
   '.tsx',
@@ -31,12 +31,12 @@ export const IGNORED_DIRECTORIES = new Set([
   '.idea',
   '.vscode',
   '__pycache__',
-  // Arcloom's own runtime dirs (so analyzing Arcloom doesn't scan uploaded repos).
+  // Decodr's own runtime dirs (so analyzing Decodr doesn't scan uploaded repos).
   'storage',
   '_uploads',
 ]);
 
-/** True if the file extension is one Arcloom treats as source code. */
+/** True if the file extension is one Decodr treats as source code. */
 export function isSourceFile(filePath: string): boolean {
   return SOURCE_EXTENSIONS.has(path.extname(filePath).toLowerCase());
 }

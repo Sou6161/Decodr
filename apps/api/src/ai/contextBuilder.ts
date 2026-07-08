@@ -1,7 +1,7 @@
 import path from 'node:path';
 import { readFile } from 'node:fs/promises';
-import type { ExplanationContext } from '@arcloom/types';
-import { RepositoryStatus } from '@arcloom/types';
+import type { ExplanationContext } from '@decodr/types';
+import { RepositoryStatus } from '@decodr/types';
 import { repositoryRepository } from '../repositories/repositoryRepository.js';
 import { fileRepository } from '../repositories/fileRepository.js';
 import { componentRepository } from '../repositories/componentRepository.js';

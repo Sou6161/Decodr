@@ -1,6 +1,6 @@
 import { useState } from 'react';
-import type { Message } from '@arcloom/types';
-import { MessageRole } from '@arcloom/types';
+import type { Message } from '@decodr/types';
+import { MessageRole } from '@decodr/types';
 import { Badge, Card } from '@/components/ui';
 import { Markdown } from './Markdown';
 

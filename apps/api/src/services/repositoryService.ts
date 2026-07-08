@@ -2,9 +2,9 @@ import type {
   Repository,
   RepositoryEntitiesResponse,
   RepositoryProgress,
-} from '@arcloom/types';
+} from '@decodr/types';
 import path from 'node:path';
-import { RepositoryStatus } from '@arcloom/types';
+import { RepositoryStatus } from '@decodr/types';
 import { storageRoot } from '../config/env.js';
 import { removeDir } from '../utils/archive.js';
 import { logger } from '../utils/logger.js';

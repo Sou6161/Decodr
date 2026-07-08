@@ -1,5 +1,5 @@
 import OpenAI from 'openai';
-import { AIProviderName } from '@arcloom/types';
+import { AIProviderName } from '@decodr/types';
 import type {
   AIProvider,
   CompletionRequest,

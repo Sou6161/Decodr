@@ -1,6 +1,6 @@
 import path from 'node:path';
 import { mkdir, rename, copyFile } from 'node:fs/promises';
-import { RepositoryStatus } from '@arcloom/types';
+import { RepositoryStatus } from '@decodr/types';
 import { storageRoot } from '../config/env.js';
 import { logger } from '../utils/logger.js';
 import { AppError } from '../utils/AppError.js';

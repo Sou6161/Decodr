@@ -1,4 +1,4 @@
-import { AIProviderName } from '@arcloom/types';
+import { AIProviderName } from '@decodr/types';
 import { env } from '../config/env.js';
 import { logger } from '../utils/logger.js';
 import type { AIProvider } from './types.js';

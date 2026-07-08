@@ -1,5 +1,5 @@
 import { motion } from 'framer-motion';
-import { ExportKind, type GraphNodeData } from '@arcloom/types';
+import { ExportKind, type GraphNodeData } from '@decodr/types';
 import { Badge } from '@/components/ui';
 import { CloseIcon } from '@/components/icons';
 

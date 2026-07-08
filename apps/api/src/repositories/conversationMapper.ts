@@ -4,7 +4,7 @@ import type {
   ConversationWithMessages,
   Message,
   MessageRole,
-} from '@arcloom/types';
+} from '@decodr/types';
 import type {
   ConversationWithCount,
   ConversationWithMessages as ConversationWithMessagesModel,

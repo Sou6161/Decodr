@@ -38,7 +38,7 @@ export function RepositoriesPage() {
         <EmptyState
           icon={<UploadIcon width={28} height={28} />}
           title="No projects yet"
-          description="Upload a project folder and Arcloom will map its components, dependencies, and structure."
+          description="Upload a project folder and Decodr will map its components, dependencies, and structure."
           action={{ label: 'Upload your first project', onClick: () => navigate('/upload') }}
         />
       )}

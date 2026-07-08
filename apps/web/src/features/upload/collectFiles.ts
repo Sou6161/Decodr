@@ -18,7 +18,7 @@ const IGNORED_DIRS = new Set([
   'node_modules', '.git', '.svn', '.hg', 'dist', 'build', 'out', '.next', '.nuxt',
   '.turbo', '.cache', 'coverage', '.vercel', '.idea', '.vscode', '__pycache__',
   '.expo', 'android', 'ios', '.gradle', 'Pods', '.dart_tool',
-  // Arcloom's own runtime dirs (so analyzing Arcloom doesn't scan uploaded repos).
+  // Decodr's own runtime dirs (so analyzing Decodr doesn't scan uploaded repos).
   'storage', '_uploads',
 ]);
 

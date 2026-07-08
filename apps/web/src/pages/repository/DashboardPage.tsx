@@ -1,6 +1,6 @@
 import { useOutletContext } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import type { Repository } from '@arcloom/types';
+import type { Repository } from '@decodr/types';
 import {
   Card,
   CardContent,

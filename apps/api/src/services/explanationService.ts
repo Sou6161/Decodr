@@ -1,4 +1,4 @@
-import type { ExplainResponse } from '@arcloom/types';
+import type { ExplainResponse } from '@decodr/types';
 import { getAIProvider } from '../ai/providerFactory.js';
 import {
   buildExplanationContext,

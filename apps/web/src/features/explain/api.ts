@@ -2,7 +2,7 @@ import type {
   AskResponse,
   ConversationResponse,
   ListConversationsResponse,
-} from '@arcloom/types';
+} from '@decodr/types';
 import { apiClient } from '@/services/apiClient';
 
 export const explainApi = {

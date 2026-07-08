@@ -1,5 +1,5 @@
 /**
- * @arcloom/types — shared contracts between the Arcloom API and web client.
+ * @decodr/types — shared contracts between the Decodr API and web client.
  * The single source of truth for domain models and HTTP DTOs.
  */
 export * from './common.js';

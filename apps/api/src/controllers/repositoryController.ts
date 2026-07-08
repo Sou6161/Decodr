@@ -6,7 +6,7 @@ import type {
   RepositoryGraphResponse,
   RepositoryProgressResponse,
   UploadRepositoryResponse,
-} from '@arcloom/types';
+} from '@decodr/types';
 import { repositoryService } from '../services/repositoryService.js';
 import { uploadService } from '../services/uploadService.js';
 import { getRepositoryGraph } from '../services/graphService.js';

@@ -38,7 +38,7 @@ export function UploadPage() {
     <div>
       <PageHeader
         title="Upload project"
-        description="Pick a project folder — Arcloom reads only the source files and maps its structure."
+        description="Pick a project folder — Decodr reads only the source files and maps its structure."
       />
 
       <Dropzone

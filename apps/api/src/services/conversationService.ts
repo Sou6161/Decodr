@@ -2,8 +2,8 @@ import type {
   AskResponse,
   Conversation,
   ConversationWithMessages,
-} from '@arcloom/types';
-import { MessageRole } from '@arcloom/types';
+} from '@decodr/types';
+import { MessageRole } from '@decodr/types';
 import { conversationRepository } from '../repositories/conversationRepository.js';
 import { messageRepository } from '../repositories/messageRepository.js';
 import {

@@ -1,8 +1,8 @@
-# Arcloom
+# Decodr
 
 **Understand any React codebase in minutes.**
 
-Arcloom is an intelligent codebase-analysis platform for React + TypeScript projects. Upload a repository as a ZIP and Arcloom statically analyzes it (via the TypeScript Compiler API — never regex), models its architecture as a component dependency graph, surfaces repository insights on a dashboard, and answers architecture questions with **context-aware** AI explanations that only ever see the files relevant to your question.
+Decodr is an intelligent codebase-analysis platform for React + TypeScript projects. Upload a repository as a ZIP and Decodr statically analyzes it (via the TypeScript Compiler API — never regex), models its architecture as a component dependency graph, surfaces repository insights on a dashboard, and answers architecture questions with **context-aware** AI explanations that only ever see the files relevant to your question.
 
 > This is a portfolio project built to demonstrate clean architecture, strong typing, and pragmatic AI integration. The AI is one module — most of the intelligence comes from static analysis and graph modeling.
 
@@ -33,7 +33,7 @@ Arcloom is an intelligent codebase-analysis platform for React + TypeScript proj
 ## Monorepo layout
 
 ```
-arcloom/
+decodr/
 ├── apps/
 │   ├── api/      # Express backend — clean architecture
 │   └── web/      # React frontend — feature-based
@@ -94,7 +94,7 @@ cp .env.example .env
 #    -> set DATABASE_URL and OPENAI_API_KEY
 
 # 3. Create the database and run migrations
-createdb arcloom            # one-time, if it doesn't exist
+createdb decodr            # one-time, if it doesn't exist
 npm run db:migrate
 
 # 4. Run both apps
@@ -119,7 +119,7 @@ npm run dev
 
 ## Architecture principles
 
-- **Strict TypeScript** everywhere, shared contracts in `@arcloom/types`.
+- **Strict TypeScript** everywhere, shared contracts in `@decodr/types`.
 - **Clean architecture** on the backend: controllers → services → repositories; the parser, graph, and AI layers are independent modules.
 - **Provider-agnostic AI**: business logic depends on an `AIProvider` interface, never on a concrete SDK.
 - **Static-analysis first**: the AI receives a small, focused context — never the whole repository.

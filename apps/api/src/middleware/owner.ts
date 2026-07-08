@@ -4,7 +4,7 @@ import { isProd } from '../config/env.js';
 import { AppError } from '../utils/AppError.js';
 import { repositoryRepository } from '../repositories/repositoryRepository.js';
 
-const COOKIE = 'arcloom_sid';
+const COOKIE = 'decodr_sid';
 const TOKEN_RE = /^[a-f0-9]{64}$/;
 const MAX_AGE_MS = 1000 * 60 * 60 * 24 * 90; // 90 days
 

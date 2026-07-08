@@ -1,6 +1,6 @@
 import type { ErrorRequestHandler, RequestHandler } from 'express';
 import { ZodError } from 'zod';
-import type { ApiError } from '@arcloom/types';
+import type { ApiError } from '@decodr/types';
 import { AppError } from '../utils/AppError.js';
 import { logger } from '../utils/logger.js';
 import { isProd } from '../config/env.js';

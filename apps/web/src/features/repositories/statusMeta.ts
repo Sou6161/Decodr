@@ -1,4 +1,4 @@
-import { RepositoryStatus } from '@arcloom/types';
+import { RepositoryStatus } from '@decodr/types';
 import type { BadgeProps } from '@/components/ui';
 
 /** Maps a repository status to a badge tone + label for consistent display. */

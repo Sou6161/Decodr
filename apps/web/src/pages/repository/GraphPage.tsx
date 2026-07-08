@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useOutletContext } from 'react-router-dom';
-import type { Repository } from '@arcloom/types';
+import type { Repository } from '@decodr/types';
 import { EmptyState, ErrorState, Skeleton } from '@/components/ui';
 import { GraphIcon } from '@/components/icons';
 import { useRepositoryGraph } from '@/features/graph/hooks';
@@ -33,7 +33,7 @@ export function GraphPage() {
       <EmptyState
         icon={<GraphIcon width={28} height={28} />}
         title="No components to visualize"
-        description="Arcloom didn't detect any React components in this repository."
+        description="Decodr didn't detect any React components in this repository."
       />
     );
   }

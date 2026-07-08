@@ -28,7 +28,7 @@ function Nav() {
       <div className="mx-auto flex h-16 max-w-6xl items-center justify-between px-5 sm:px-8">
         <Link to="/" className="flex items-center gap-2.5">
           <Logo />
-          <span className="text-base font-semibold tracking-tight">Arcloom</span>
+          <span className="text-base font-semibold tracking-tight">Decodr</span>
           <span className="ml-1 rounded-md border border-border px-1.5 py-0.5 font-mono text-[10px] text-subtle">
             v0.1
           </span>
@@ -71,7 +71,7 @@ function Hero() {
           <Sparkle className="absolute -right-2 top-8 text-accent" size={16} />
         </h1>
         <p className="mt-5 max-w-lg text-base leading-relaxed text-muted">
-          Drop a project and Arcloom maps its architecture with the TypeScript compiler —
+          Drop a project and Decodr maps its architecture with the TypeScript compiler —
           components, hooks, routes, and how they connect — then answers questions about it
           with the <span className="text-foreground">actual code</span> in context. No
           embeddings, no guessing.
@@ -95,7 +95,7 @@ function Hero() {
 
         <div className="mt-7 inline-flex items-center gap-2 rounded-lg border border-border bg-background/50 px-3 py-2 font-mono text-xs text-muted">
           <span className="text-subtle">$</span>
-          <span>arcloom</span>
+          <span>decodr</span>
           <span className="text-accent">./my-app</span>
           <motion.span
             className="ml-0.5 inline-block h-3.5 w-[7px] bg-primary"
@@ -124,7 +124,7 @@ function Hero() {
 }
 
 const SCAN_LINES = [
-  { text: '$ arcloom ./my-app', tone: 'prompt' },
+  { text: '$ decodr ./my-app', tone: 'prompt' },
   { text: '→ extracting · scanning · parsing (ts compiler api)', tone: 'muted' },
   { text: '✓ 214 files · 62 components · 11 hooks · 7 routes', tone: 'ok' },
   { text: '✓ 148 relationships mapped', tone: 'ok' },
@@ -142,7 +142,7 @@ function HowItWorks() {
             <span className="h-2.5 w-2.5 rounded-full bg-danger/70" />
             <span className="h-2.5 w-2.5 rounded-full bg-warning/70" />
             <span className="h-2.5 w-2.5 rounded-full bg-success/70" />
-            <span className="ml-2 font-mono text-[11px] text-subtle">arcloom — scan</span>
+            <span className="ml-2 font-mono text-[11px] text-subtle">decodr — scan</span>
           </div>
           <div className="space-y-1.5 p-4 font-mono text-[13px] leading-relaxed">
             {SCAN_LINES.map((line, i) => (
@@ -169,7 +169,7 @@ function HowItWorks() {
           {[
             { n: '01', t: 'Scan', d: 'Your source is walked and indexed. node_modules, builds, and .git are skipped automatically.' },
             { n: '02', t: 'Map', d: 'The TypeScript compiler extracts components, hooks, and routes — and models how they render one another. Never regex.' },
-            { n: '03', t: 'Explain', d: 'Ask how a feature works. Arcloom sends only the relevant files to the model and answers with real code.' },
+            { n: '03', t: 'Explain', d: 'Ask how a feature works. Decodr sends only the relevant files to the model and answers with real code.' },
           ].map((s) => (
             <li key={s.n} className="flex gap-4">
               <span className="font-mono text-sm text-primary">{s.n}</span>
@@ -290,7 +290,7 @@ function Footer() {
       <div className="mx-auto flex max-w-6xl flex-col items-center justify-between gap-3 px-5 py-8 sm:flex-row sm:px-8">
         <div className="flex items-center gap-2">
           <Logo />
-          <span className="font-mono text-xs text-subtle">arcloom — understand any codebase</span>
+          <span className="font-mono text-xs text-subtle">decodr — understand any codebase</span>
         </div>
         <p className="font-mono text-[11px] text-subtle">A portfolio project · {new Date().getFullYear()}</p>
       </div>

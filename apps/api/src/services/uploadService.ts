@@ -1,5 +1,5 @@
-import type { Repository } from '@arcloom/types';
-import { RepositoryStatus } from '@arcloom/types';
+import type { Repository } from '@decodr/types';
+import { RepositoryStatus } from '@decodr/types';
 import { repositoryRepository } from '../repositories/repositoryRepository.js';
 import { toRepositoryDto } from '../repositories/repositoryMapper.js';
 import { AppError } from '../utils/AppError.js';

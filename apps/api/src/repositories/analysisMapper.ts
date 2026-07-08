@@ -1,5 +1,5 @@
 import type { File as FileModel, Hook as HookModel, Route as RouteModel } from '@prisma/client';
-import type { ComponentNode, FileNode, HookNode, RouteNode } from '@arcloom/types';
+import type { ComponentNode, FileNode, HookNode, RouteNode } from '@decodr/types';
 import type { ComponentWithPath } from './componentRepository.js';
 
 export function toFileNode(file: FileModel): FileNode {
