@@ -1,5 +1,5 @@
 import { createApp } from './app.js';
-import { env } from './config/env.js';
+import { port } from './config/env.js';
 import { connectDatabase, disconnectDatabase } from './database/prisma.js';
 import { logger } from './utils/logger.js';
 
@@ -7,8 +7,9 @@ async function main(): Promise<void> {
   await connectDatabase();
 
   const app = createApp();
-  const server = app.listen(env.API_PORT, () => {
-    logger.info(`Decodr API listening on http://localhost:${env.API_PORT}`);
+  // Bind to 0.0.0.0 so hosting platforms (Render) can route to the service.
+  const server = app.listen(port, '0.0.0.0', () => {
+    logger.info(`Decodr API listening on port ${port}`);
   });
 
   const shutdown = async (signal: string): Promise<void> => {

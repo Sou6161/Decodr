@@ -22,7 +22,9 @@ export const attachOwner: RequestHandler = (req, res, next) => {
     token = randomBytes(32).toString('hex');
     res.cookie(COOKIE, token, {
       httpOnly: true,
-      sameSite: 'lax',
+      // Cross-site in production (Vercel ↔ Render) needs SameSite=None + Secure;
+      // Lax is fine for same-origin local dev.
+      sameSite: isProd ? 'none' : 'lax',
       secure: isProd,
       maxAge: MAX_AGE_MS,
       path: '/',

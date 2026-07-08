@@ -59,6 +59,9 @@ function loadEnv(): Env {
 /** Validated, strongly-typed environment. Import this — never read process.env directly. */
 export const env = loadEnv();
 
+/** The port to bind to — the platform's PORT wins over API_PORT. */
+export const port = env.PORT ?? env.API_PORT;
+
 /** Resolved absolute path to the storage directory. */
 export const storageRoot = path.isAbsolute(env.STORAGE_DIR)
   ? env.STORAGE_DIR
