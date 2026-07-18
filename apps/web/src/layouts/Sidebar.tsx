@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { NavLink, useMatch, useNavigate, useSearchParams } from 'react-router-dom';
+import { Link, NavLink, useMatch, useNavigate, useSearchParams } from 'react-router-dom';
 import { cn } from '@/utils/cn';
 import {
   DashboardIcon,
@@ -43,10 +43,17 @@ export function Sidebar({ onNavigate }: { onNavigate?: () => void }) {
 
   return (
     <div className="flex h-full flex-col p-4">
-      <NavLink to="/app" onClick={onNavigate} className="mb-6 flex items-center gap-2.5 px-2">
+      {/* The brand mark is the way back out to the landing page — "Projects" below
+          already covers /app, so the logo doesn't need to duplicate it. */}
+      <Link
+        to="/"
+        onClick={onNavigate}
+        title="Back to home"
+        className="mb-6 flex items-center gap-2.5 px-2 transition-opacity hover:opacity-80"
+      >
         <Logo />
         <span className="text-base font-semibold tracking-tight">Decodr</span>
-      </NavLink>
+      </Link>
 
       <p className="px-3 pb-1 text-[11px] font-medium uppercase tracking-wider text-subtle">
         Workspace

@@ -17,7 +17,7 @@ export function Topbar() {
         <MenuIcon />
       </button>
 
-      <Link to="/app" className="flex items-center gap-2 lg:hidden">
+      <Link to="/" title="Back to home" className="flex items-center gap-2 lg:hidden">
         <Logo />
         <span className="font-semibold">Decodr</span>
       </Link>
