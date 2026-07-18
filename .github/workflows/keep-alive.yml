@@ -1,0 +1,19 @@
+name: keep-alive
+
+# Pings the Render backend so the free instance doesn't spin down (which would
+# add a ~50s cold start). Hits the DB-free /api/ping so Neon can still autosuspend.
+# Note: GitHub's scheduled runs are best-effort (often delayed) and auto-disable
+# after 60 days without repo activity — an external monitor (UptimeRobot) is more
+# reliable. This is the zero-signup option.
+
+on:
+  schedule:
+    - cron: '*/10 * * * *' # every 10 minutes
+  workflow_dispatch: {}
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Ping backend
+        run: curl -fsS --max-time 60 https://decodr-api.onrender.com/api/ping || true
