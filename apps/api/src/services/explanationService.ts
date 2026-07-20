@@ -20,7 +20,7 @@ import { AppError } from '../utils/AppError.js';
 export async function explainRepository(
   repositoryId: string,
   question: string,
-  opts: { detailed?: boolean; history?: HistoryTurn[] } = {},
+  opts: { detailed?: boolean; history?: HistoryTurn[]; summary?: string | null } = {},
 ): Promise<ExplainResponse> {
   const trimmed = question.trim();
   if (trimmed.length < 3) {
@@ -60,7 +60,11 @@ export async function explainRepository(
     );
   }
 
-  const messages = buildMessages(context, trimmed, { detailed, history });
+  const messages = buildMessages(context, trimmed, {
+    detailed,
+    history,
+    summary: opts.summary ?? null,
+  });
   const result = await provider.complete({
     messages,
     temperature: 0.4,

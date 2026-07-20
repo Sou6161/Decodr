@@ -114,24 +114,39 @@ export interface HistoryTurn {
   content: string;
 }
 
-/** How much earlier conversation to replay, and how much of each answer. */
-const MAX_HISTORY_TURNS = 8;
-const MAX_HISTORY_ANSWER_CHARS = 1500;
+/** How much earlier conversation to replay verbatim, and how much of each answer. */
+export const MAX_HISTORY_TURNS = 8;
+const MAX_HISTORY_ANSWER_CHARS = 1200;
 
 /**
- * Trims history to fit the budget. Past *answers* are the expensive part — a
- * detailed one can run 9k tokens — so they're clipped to their opening, which is
- * where the conclusion lives. Questions are kept whole; they're short and they
- * carry the thread's intent.
+ * Strips fenced code blocks out of a past answer.
+ *
+ * This is the single biggest token saving available, and it costs nothing in
+ * quality: a detailed answer is mostly code snippets, but those snippets were
+ * quoted from files that are re-attached in full on every turn. Replaying them
+ * pays twice for the same bytes. The prose — the reasoning, the conclusions,
+ * the "why" — is what a follow-up actually refers back to, and it's kept.
+ */
+function stripCodeBlocks(content: string): string {
+  return content
+    .replace(/```[\s\S]*?```/g, '`[code omitted — the file is attached below]`')
+    .replace(/\n{3,}/g, '\n\n')
+    .trim();
+}
+
+/**
+ * Trims history to fit the budget: code out, then clip what's left. Questions
+ * are kept whole — they're short and carry the thread's intent.
  */
 function trimHistory(history: HistoryTurn[]): ChatMessage[] {
   return history.slice(-MAX_HISTORY_TURNS).map((turn) => {
-    if (turn.role === 'user' || turn.content.length <= MAX_HISTORY_ANSWER_CHARS) {
-      return { role: turn.role, content: turn.content };
-    }
+    if (turn.role === 'user') return { role: turn.role, content: turn.content };
+
+    const prose = stripCodeBlocks(turn.content);
+    if (prose.length <= MAX_HISTORY_ANSWER_CHARS) return { role: turn.role, content: prose };
     return {
       role: turn.role,
-      content: `${turn.content.slice(0, MAX_HISTORY_ANSWER_CHARS)}\n\n[… earlier answer truncated]`,
+      content: `${prose.slice(0, MAX_HISTORY_ANSWER_CHARS)}\n\n[… earlier answer truncated]`,
     };
   });
 }
@@ -144,7 +159,7 @@ function trimHistory(history: HistoryTurn[]): ChatMessage[] {
 export function buildMessages(
   context: ExplanationContext,
   question: string,
-  opts: { detailed?: boolean; history?: HistoryTurn[] } = {},
+  opts: { detailed?: boolean; history?: HistoryTurn[]; summary?: string | null } = {},
 ): ChatMessage[] {
   const header: string[] = [];
   if (context.focusName) header.push(`This question is about: ${context.focusName}.`);
@@ -171,9 +186,19 @@ export function buildMessages(
     .join('\n\n');
 
   const history = trimHistory(opts.history ?? []);
+  const summary = opts.summary?.trim();
 
   return [
     { role: 'system', content: SYSTEM_PROMPT },
+    // The summary stands in for turns that have aged out of the verbatim window.
+    ...(summary
+      ? [
+          {
+            role: 'system' as const,
+            content: `Earlier in this conversation (summarized):\n${summary}`,
+          },
+        ]
+      : []),
     ...history,
     { role: 'user', content: userContent },
   ];

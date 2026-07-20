@@ -13,6 +13,7 @@ import {
 } from '../repositories/conversationMapper.js';
 import { explainRepository } from './explanationService.js';
 import type { HistoryTurn } from '../ai/promptBuilder.js';
+import { maybeExtendSummary, type SummaryState } from '../ai/summarizer.js';
 import { AppError } from '../utils/AppError.js';
 
 /** First line of the question, trimmed, as the conversation title. */
@@ -62,6 +63,7 @@ export const conversationService = {
     // Verify an existing conversation belongs to this repository up front, and
     // load its turns as the model's memory of the thread.
     let history: HistoryTurn[] = [];
+    let summaryState: SummaryState = { summary: null, summarizedCount: 0 };
     if (conversationId) {
       const existing = await conversationRepository.findWithMessages(conversationId, repositoryId);
       if (!existing) {
@@ -71,12 +73,29 @@ export const conversationService = {
         role: m.role === MessageRole.Assistant ? 'assistant' : 'user',
         content: m.content,
       }));
+      summaryState = {
+        summary: existing.summary,
+        summarizedCount: existing.summarizedCount,
+      };
+
+      // Fold any turns that have aged out of the verbatim window into the rolling
+      // summary. Usually a no-op; only fires once a batch has accumulated.
+      const extended = await maybeExtendSummary(history, summaryState);
+      if (extended) {
+        summaryState = extended;
+        await conversationRepository.saveSummary(
+          conversationId,
+          extended.summary,
+          extended.summarizedCount,
+        );
+      }
     }
 
     // Generate the answer before writing anything.
     const result = await explainRepository(repositoryId, question, {
       detailed: detailed ?? false,
       history,
+      summary: summaryState.summary,
     });
 
     const conversation =

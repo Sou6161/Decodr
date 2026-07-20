@@ -47,6 +47,14 @@ export const conversationRepository = {
     });
   },
 
+  /** Persists the rolling summary and how many messages it now covers. */
+  saveSummary(id: string, summary: string, summarizedCount: number): Promise<unknown> {
+    return prisma.conversation.update({
+      where: { id },
+      data: { summary, summarizedCount },
+    });
+  },
+
   /** Bumps updatedAt so the conversation sorts to the top of the list. */
   touch(id: string): Promise<unknown> {
     return prisma.conversation.update({

@@ -145,6 +145,13 @@ model Conversation {
   title    String
   messages Message[]
 
+  /// Rolling summary of turns that have aged out of the verbatim window, so a
+  /// long thread keeps its early context without replaying every message.
+  summary String?
+  /// How many messages the summary already covers. Lets the summary be extended
+  /// incrementally instead of regenerated from scratch on every turn.
+  summarizedCount Int @default(0)
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
