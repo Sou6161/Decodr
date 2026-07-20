@@ -5,7 +5,7 @@ import {
   DETAILED_LIMITS,
   QUICK_LIMITS,
 } from '../ai/contextBuilder.js';
-import { buildMessages } from '../ai/promptBuilder.js';
+import { buildMessages, type HistoryTurn } from '../ai/promptBuilder.js';
 import { AppError } from '../utils/AppError.js';
 
 /**
@@ -20,7 +20,7 @@ import { AppError } from '../utils/AppError.js';
 export async function explainRepository(
   repositoryId: string,
   question: string,
-  opts: { detailed?: boolean } = {},
+  opts: { detailed?: boolean; history?: HistoryTurn[] } = {},
 ): Promise<ExplainResponse> {
   const trimmed = question.trim();
   if (trimmed.length < 3) {
@@ -39,14 +39,28 @@ export async function explainRepository(
   const detailed = opts.detailed ?? false;
   const limits = detailed ? DETAILED_LIMITS : QUICK_LIMITS;
 
-  const context = await buildExplanationContext(repositoryId, trimmed, limits);
+  const history = opts.history ?? [];
+
+  // Retrieval query, not the prompt. A follow-up like "why?" or "show me that"
+  // has no keywords of its own, so the recent *questions* in the thread are
+  // folded in — that's what keeps the file selection on the same subject.
+  // Past answers are excluded: they're long and would swamp the keyword scoring.
+  const retrievalQuery = [
+    ...history
+      .filter((t) => t.role === 'user')
+      .slice(-2)
+      .map((t) => t.content),
+    trimmed,
+  ].join(' ');
+
+  const context = await buildExplanationContext(repositoryId, retrievalQuery, limits);
   if (context.files.length === 0) {
     throw AppError.unprocessable(
       "Couldn't find code relevant to that question. Try naming a component, or ask about routing.",
     );
   }
 
-  const messages = buildMessages(context, trimmed, { detailed });
+  const messages = buildMessages(context, trimmed, { detailed, history });
   const result = await provider.complete({
     messages,
     temperature: 0.4,

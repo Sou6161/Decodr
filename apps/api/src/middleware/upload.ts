@@ -38,8 +38,18 @@ const uploader = multer({
   },
 });
 
-/** Source-file extensions accepted for direct folder uploads. */
+/**
+ * Files accepted for direct folder uploads: source extensions plus the small set
+ * of manifests that answer "what does this project use?".
+ *
+ * This must stay in sync with the client-side filter in `collectFiles.ts` — the
+ * client sends one manifest entry per file, so anything rejected here makes the
+ * counts disagree and the whole upload fails.
+ */
 const SOURCE_FILE = /\.(tsx?|jsx?|mjs|cjs)$/i;
+const MANIFEST_FILE = /(^|\/)(package\.json|\.env\.example|\.env\.sample)$/i;
+const accepted = (name: string): boolean =>
+  SOURCE_FILE.test(name) || MANIFEST_FILE.test(name);
 
 /**
  * Multiple source files streamed to disk for a direct folder upload. The client
@@ -52,7 +62,7 @@ const folderUploader = multer({
     filename: (_req, _file, cb) => cb(null, `${randomUUID()}.src`),
   }),
   limits: { fileSize: 4 * 1024 * 1024, files: 12_000, fields: 10 },
-  fileFilter: (_req, file, cb) => cb(null, SOURCE_FILE.test(file.originalname)),
+  fileFilter: (_req, file, cb) => cb(null, accepted(file.originalname)),
 });
 
 const single = uploader.single('file');

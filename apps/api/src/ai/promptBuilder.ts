@@ -23,6 +23,9 @@ Hard style rules — this matters:
 - Structure with a few short headed sections so it's easy to follow, and let the code snippets carry a lot of the weight. Write the connective explanation in full sentences, not terse label-bullets.
 - Be concrete: real names, real data shapes, real logic. Explain the "how" and the "why". Cut only pure filler, never substance.
 - Ground everything in the attached files; if something needed isn't there, say briefly where you'd look. Never invent files, props, or libraries.
+- ANSWER THE QUESTION THAT WAS ASKED, directly, in the opening line — before any walkthrough. If it's a factual question ("which AI model does this use?", "what database?", "how is auth done?"), lead with the specific answer and the file and line that proves it. Never respond to a direct question with a general architecture tour.
+- If the attached files genuinely don't contain the answer, say so in one plain sentence and name the file you'd need to see (e.g. "the model name isn't in these files — it'd be in the provider config or an env var"). Saying "I can't tell from these files" is a correct answer; quietly changing the subject is not.
+- Check the manifest files (\`package.json\`, \`.env.example\`) when they're attached — dependency names, versions, and env keys are hard evidence for what the project actually uses. Quote the relevant lines.
 - No AI filler ("As an AI", "Certainly!", "I hope this helps", "In this codebase we can see"). Don't restate the question. No empty wrap-up like "this makes it easy to…". Start with the answer.
 
 Here is the register to match — detailed, explained as a story, and carried by real code snippets from the files.
@@ -99,14 +102,49 @@ function fence(filePath: string): string {
 const DETAILED_NOTE =
   'MODE: DETAILED. Go all-out. Use everything in the attached files, trace every meaningful flow including secondary ones (loading/error/empty states, edge cases, types, helpers), and show plenty of real code snippets with explanation. Do not skip anything important — a longer, exhaustive answer is exactly what is wanted here.';
 
+const FOLLOWUP_NOTE =
+  'This is a follow-up in an ongoing conversation — the earlier turns are above. Resolve pronouns and shorthand ("it", "that function", "why?") against what was already discussed, and do not re-explain ground you already covered; build on it. The files attached below are freshly selected for THIS question, so they may differ from the earlier ones.';
+
 const QUICK_NOTE =
   'MODE: QUICK. Give a focused, efficient answer — the core of how it works with one or two key code snippets. Keep it tight; skip the secondary flows.';
 
-/** Assembles the chat messages: persona + focused context + the question. */
+/** A prior turn in the same conversation, oldest first. */
+export interface HistoryTurn {
+  role: 'user' | 'assistant';
+  content: string;
+}
+
+/** How much earlier conversation to replay, and how much of each answer. */
+const MAX_HISTORY_TURNS = 8;
+const MAX_HISTORY_ANSWER_CHARS = 1500;
+
+/**
+ * Trims history to fit the budget. Past *answers* are the expensive part — a
+ * detailed one can run 9k tokens — so they're clipped to their opening, which is
+ * where the conclusion lives. Questions are kept whole; they're short and they
+ * carry the thread's intent.
+ */
+function trimHistory(history: HistoryTurn[]): ChatMessage[] {
+  return history.slice(-MAX_HISTORY_TURNS).map((turn) => {
+    if (turn.role === 'user' || turn.content.length <= MAX_HISTORY_ANSWER_CHARS) {
+      return { role: turn.role, content: turn.content };
+    }
+    return {
+      role: turn.role,
+      content: `${turn.content.slice(0, MAX_HISTORY_ANSWER_CHARS)}\n\n[… earlier answer truncated]`,
+    };
+  });
+}
+
+/**
+ * Assembles the chat messages: persona + prior turns + focused context + the
+ * question. Replaying history is what makes follow-ups ("why?", "show me that
+ * part") resolve against what was already said.
+ */
 export function buildMessages(
   context: ExplanationContext,
   question: string,
-  opts: { detailed?: boolean } = {},
+  opts: { detailed?: boolean; history?: HistoryTurn[] } = {},
 ): ChatMessage[] {
   const header: string[] = [];
   if (context.focusName) header.push(`This question is about: ${context.focusName}.`);
@@ -123,6 +161,7 @@ export function buildMessages(
 
   const userContent = [
     opts.detailed ? DETAILED_NOTE : QUICK_NOTE,
+    (opts.history?.length ?? 0) > 0 ? FOLLOWUP_NOTE : '',
     header.join('\n'),
     'Relevant files from the repository:',
     fileBlocks,
@@ -131,8 +170,11 @@ export function buildMessages(
     .filter(Boolean)
     .join('\n\n');
 
+  const history = trimHistory(opts.history ?? []);
+
   return [
     { role: 'system', content: SYSTEM_PROMPT },
+    ...history,
     { role: 'user', content: userContent },
   ];
 }

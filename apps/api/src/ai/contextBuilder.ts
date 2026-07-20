@@ -43,19 +43,39 @@ const STOPWORDS = new Set([
   'when', 'which', 'show', 'please', 'tell', 'about', 'its', 'handle', 'handled',
   'implement', 'implemented', 'get', 'set', 'all', 'way', 'flow', 'inside',
   'part', 'here', 'they', 'them', 'from', 'into', 'your', 'you', 'can', 'give',
+  // Two-letter noise — kept separate because the length floor is now 2, so that
+  // domain terms like "ai", "ui", "db", "s3" survive.
+  'is', 'it', 'of', 'to', 'in', 'on', 'at', 'be', 'by', 'or', 'as', 'an', 'if',
+  'so', 'we', 'my', 'me', 'no', 'up', 'am', 'us', 'go', 'has', 'was', 'any',
 ]);
 
-/** Extracts meaningful lowercase keywords from a question. */
+/**
+ * Extracts meaningful lowercase keywords from a question.
+ *
+ * The length floor is 2, not 3: short technical terms carry the most signal in
+ * questions like "which AI is it using" or "how does the DB work", and a 3-char
+ * floor silently dropped every one of them — leaving zero keywords and sending
+ * the question down the generic fallback path.
+ */
 function extractKeywords(question: string): string[] {
   return [
     ...new Set(
       question
         .toLowerCase()
         .split(/[^a-z0-9]+/)
-        .filter((w) => w.length >= 3 && !STOPWORDS.has(w)),
+        .filter((w) => w.length >= 2 && !STOPWORDS.has(w)),
     ),
   ];
 }
+
+/**
+ * Questions about the stack ("which AI does it use", "what database", "which
+ * libraries") are answered by the dependency manifest, not by component code.
+ */
+const STACK_INTENT =
+  /\b(ai|llm|model|api|sdk|database|db|orm|librar\w*|dependenc\w*|package\w*|stack|tech|framework|auth|payment|hosting|deploy\w*|version)\b/i;
+
+const MANIFEST_RE = /(^|\/)(package\.json|\.env\.example|\.env\.sample)$/i;
 
 const fileBaseName = (p: string): string =>
   (p.split('/').pop() ?? '').replace(/\.\w+$/, '').toLowerCase();
@@ -119,6 +139,19 @@ export async function buildExplanationContext(
 
   const keywords = extractKeywords(question);
 
+  // "Which AI / database / libraries does this use?" is answered by the manifest,
+  // which no component name or folder path will ever match on keywords alone.
+  // Front-load them so they survive the maxFiles cut.
+  const manifestPaths = STACK_INTENT.test(question)
+    ? allFiles
+        .map((f) => f.path)
+        .filter((p) => MANIFEST_RE.test(p))
+        // Shallowest first: the root package.json describes the project, a
+        // deeply-nested one describes a sub-package.
+        .sort((a, b) => a.split('/').length - b.split('/').length)
+        .slice(0, 4)
+    : [];
+
   // Rank components and files by how well they match the question keywords.
   const scoredComponents = components
     .map((c) => ({ c, score: scoreComponent(c, keywords) }))
@@ -136,7 +169,7 @@ export async function buildExplanationContext(
   let relatedComponents: string[] = [];
   let orderedPaths: string[] = [];
 
-  if (keywords.length > 0 && (focus || scoredFiles.length > 0)) {
+  if (keywords.length > 0 && (focus || scoredFiles.length > 0 || manifestPaths.length > 0)) {
     // Keyword-driven: the feature the user named (by component name or folder).
     focusName = focus?.name ?? capitalize(keywords[0]!);
 
@@ -166,6 +199,7 @@ export async function buildExplanationContext(
     // Focus file, then the feature's folder files, then graph neighbors, then
     // other keyword-matched components.
     orderedPaths = unique([
+      ...manifestPaths,
       ...(focus ? [focus.file.path] : []),
       ...scoredFiles.slice(0, maxFiles).map((x) => x.path),
       ...neighborPaths,

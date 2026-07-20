@@ -23,6 +23,12 @@ const IGNORED_DIRS = new Set([
 ]);
 
 const SOURCE_EXT = /\.(tsx?|jsx?|mjs|cjs)$/i;
+/**
+ * Manifests answer "what does this project use?" — dependencies, scripts, env
+ * keys. Only the `.example` env variants, never a real `.env`, so nobody's
+ * secrets leave the browser.
+ */
+const MANIFEST_RE = /(^|\/)(package\.json|\.env\.example|\.env\.sample)$/i;
 const MAX_FILE_BYTES = 2 * 1024 * 1024; // skip minified/generated blobs
 const MAX_FILES = 8000;
 
@@ -35,7 +41,7 @@ export function filterSourceFiles(files: PickedFile[]): PickedFile[] {
   return files
     .filter(
       (f) =>
-        SOURCE_EXT.test(f.path) &&
+        (SOURCE_EXT.test(f.path) || MANIFEST_RE.test(f.path)) &&
         !hasIgnoredSegment(f.path) &&
         f.file.size <= MAX_FILE_BYTES,
     )

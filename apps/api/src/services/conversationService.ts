@@ -12,6 +12,7 @@ import {
   toMessageDto,
 } from '../repositories/conversationMapper.js';
 import { explainRepository } from './explanationService.js';
+import type { HistoryTurn } from '../ai/promptBuilder.js';
 import { AppError } from '../utils/AppError.js';
 
 /** First line of the question, trimmed, as the conversation title. */
@@ -44,9 +45,11 @@ export const conversationService = {
 
   /**
    * Answers a question and persists it. The AI call runs *first*, so a failure
-   * (e.g. provider error) never leaves an orphaned conversation. Each question
-   * builds its own focused context — the saved thread is a history of
-   * independent Q&As, not a memory the model reads back.
+   * (e.g. provider error) never leaves an orphaned conversation.
+   *
+   * Each question builds its own focused context, but the earlier turns of the
+   * thread are replayed to the model, so follow-ups ("why?", "what about the
+   * other one?") resolve against what was already said.
    */
   async ask(params: {
     repositoryId: string;
@@ -56,16 +59,25 @@ export const conversationService = {
   }): Promise<AskResponse> {
     const { repositoryId, conversationId, question, detailed } = params;
 
-    // Verify an existing conversation belongs to this repository up front.
+    // Verify an existing conversation belongs to this repository up front, and
+    // load its turns as the model's memory of the thread.
+    let history: HistoryTurn[] = [];
     if (conversationId) {
-      const existing = await conversationRepository.findWithCount(conversationId, repositoryId);
+      const existing = await conversationRepository.findWithMessages(conversationId, repositoryId);
       if (!existing) {
         throw AppError.notFound('Conversation not found', 'CONVERSATION_NOT_FOUND');
       }
+      history = existing.messages.map((m) => ({
+        role: m.role === MessageRole.Assistant ? 'assistant' : 'user',
+        content: m.content,
+      }));
     }
 
     // Generate the answer before writing anything.
-    const result = await explainRepository(repositoryId, question, { detailed: detailed ?? false });
+    const result = await explainRepository(repositoryId, question, {
+      detailed: detailed ?? false,
+      history,
+    });
 
     const conversation =
       conversationId ??
