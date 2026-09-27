@@ -5,8 +5,10 @@ import { Spinner } from '@/components/ui';
 import {
   collectFromDataTransfer,
   collectFromInput,
-  filterSourceFiles,
+  collectFromDirectoryPicker,
+  supportsDirectoryPicker,
   rootName,
+  type ScanProgress,
   type UploadSelection,
 } from './collectFiles';
 
@@ -24,6 +26,10 @@ export function Dropzone({ onSelect, isUploading, error }: DropzoneProps) {
   const zipRef = useRef<HTMLInputElement>(null);
   const [dragging, setDragging] = useState(false);
   const [localError, setLocalError] = useState<string | null>(null);
+  // Reading a folder is a separate, sometimes slow phase before any upload
+  // starts. Showing "Uploading…" through it made a scan look like a stall.
+  const [scanning, setScanning] = useState(false);
+  const [progress, setProgress] = useState<ScanProgress | null>(null);
 
   const emit = useCallback(
     (selection: UploadSelection | null) => {
@@ -48,14 +54,49 @@ export function Dropzone({ onSelect, isUploading, error }: DropzoneProps) {
   const handleDrop = async (e: DragEvent<HTMLDivElement>) => {
     e.preventDefault();
     setDragging(false);
-    if (isUploading) return;
-    emit(await collectFromDataTransfer(e.dataTransfer));
+    if (isUploading || scanning) return;
+    setScanning(true);
+    try {
+      emit(await collectFromDataTransfer(e.dataTransfer));
+    } finally {
+      setScanning(false);
+    }
   };
 
-  const handleFolderInput = (fileList: FileList | null) => {
+  const handleFolderInput = async (fileList: FileList | null) => {
     if (!fileList || fileList.length === 0) return;
-    const files = filterSourceFiles(collectFromInput(fileList));
-    emit({ kind: 'folder', files, name: rootName(files) });
+    setScanning(true);
+    // Yield once so the scanning state paints before the synchronous filter
+    // blocks the main thread on a very large folder.
+    await new Promise((r) => setTimeout(r, 0));
+    try {
+      const files = collectFromInput(fileList);
+      emit({ kind: 'folder', files, name: rootName(files) });
+    } finally {
+      setScanning(false);
+      setProgress(null);
+    }
+  };
+
+  /**
+   * Preferred path: walk the directory ourselves so ignored folders are never
+   * opened. Falls back to the file input on browsers without the API.
+   */
+  const pickFolder = async () => {
+    if (isUploading || scanning) return;
+    if (!supportsDirectoryPicker()) {
+      folderRef.current?.click();
+      return;
+    }
+    setScanning(true);
+    setProgress({ seen: 0, kept: 0 });
+    try {
+      const selection = await collectFromDirectoryPicker(setProgress);
+      if (selection) emit(selection);
+    } finally {
+      setScanning(false);
+      setProgress(null);
+    }
   };
 
   const handleZipInput = (file: File | undefined) => {
@@ -74,12 +115,12 @@ export function Dropzone({ onSelect, isUploading, error }: DropzoneProps) {
       <div
         role="button"
         tabIndex={0}
-        aria-disabled={isUploading}
-        onClick={() => !isUploading && folderRef.current?.click()}
+        aria-disabled={isUploading || scanning}
+        onClick={() => void pickFolder()}
         onKeyDown={(e) => {
-          if ((e.key === 'Enter' || e.key === ' ') && !isUploading) {
+          if ((e.key === 'Enter' || e.key === ' ') && !isUploading && !scanning) {
             e.preventDefault();
-            folderRef.current?.click();
+            void pickFolder();
           }
         }}
         onDrop={handleDrop}
@@ -94,7 +135,7 @@ export function Dropzone({ onSelect, isUploading, error }: DropzoneProps) {
           dragging
             ? 'border-primary bg-primary/5'
             : 'border-border hover:border-border-strong hover:bg-surface-raised/40',
-          isUploading && 'pointer-events-none opacity-70',
+          (isUploading || scanning) && 'pointer-events-none opacity-70',
         )}
       >
         <div
@@ -103,19 +144,33 @@ export function Dropzone({ onSelect, isUploading, error }: DropzoneProps) {
             dragging ? 'bg-primary/20 text-primary' : 'bg-surface-raised text-subtle',
           )}
         >
-          {isUploading ? <Spinner className="h-6 w-6" /> : <FolderIcon width={28} height={28} />}
+          {isUploading || scanning ? (
+            <Spinner className="h-6 w-6" />
+          ) : (
+            <FolderIcon width={28} height={28} />
+          )}
         </div>
 
         <h3 className="text-base font-semibold text-foreground">
-          {isUploading ? 'Uploading…' : dragging ? 'Drop to upload' : 'Drop your project folder here'}
+          {scanning
+            ? 'Reading folder…'
+            : isUploading
+              ? 'Uploading…'
+              : dragging
+                ? 'Drop to upload'
+                : 'Drop your project folder here'}
         </h3>
         <p className="mt-1.5 max-w-md text-sm text-muted">
-          {isUploading
-            ? 'Sending your source files to Decodr.'
-            : 'Drag a folder, or click to choose one. Only source files are read — node_modules, builds, and .git are skipped automatically.'}
+          {scanning
+            ? progress
+              ? `Scanned ${progress.seen.toLocaleString()} files · found ${progress.kept} source file${progress.kept === 1 ? '' : 's'}`
+              : 'Looking through the folder for source files…'
+            : isUploading
+              ? 'Sending your source files to Decodr.'
+              : 'Drag a folder, or click to choose one. Only source files are read — node_modules, builds, and .git are skipped automatically.'}
         </p>
 
-        {!isUploading && (
+        {!isUploading && !scanning && (
           <button
             type="button"
             onClick={(e) => {
