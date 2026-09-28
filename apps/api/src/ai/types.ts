@@ -30,6 +30,8 @@ export interface CompletionRequest {
   temperature?: number;
   /** Tools the model may call. Omit for a plain completion. */
   tools?: ToolSpec[];
+  /** Aborts the upstream request — used when the reader stops the answer. */
+  signal?: AbortSignal;
 }
 
 export interface CompletionResult {

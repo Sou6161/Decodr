@@ -37,6 +37,8 @@ export async function explainRepository(
     summary?: string | null;
     /** When present the answer is streamed through these callbacks as it is produced. */
     stream?: ExplainStreamHandlers;
+    /** Cancels the in-flight model call when the reader stops the answer. */
+    signal?: AbortSignal;
   } = {},
 ): Promise<ExplainResponse> {
   const trimmed = question.trim();
@@ -69,6 +71,7 @@ export async function explainRepository(
       messages: buildChatMessages(facts, trimmed, history),
       temperature: 0.6,
       maxTokens: 400,
+      ...(opts.signal ? { signal: opts.signal } : {}),
     };
     const result = opts.stream
       ? await provider.stream(req, { onDelta: opts.stream.onDelta })
@@ -126,8 +129,12 @@ export async function explainRepository(
   // Headroom for on-demand reads, on top of what retrieval already spent.
   let readBudget = detailed ? 160_000 : 30_000;
 
-  const run = (req: Parameters<typeof provider.complete>[0]) =>
-    opts.stream ? provider.stream(req, { onDelta: opts.stream.onDelta }) : provider.complete(req);
+  const run = (req: Parameters<typeof provider.complete>[0]) => {
+    const withSignal = opts.signal ? { ...req, signal: opts.signal } : req;
+    return opts.stream
+      ? provider.stream(withSignal, { onDelta: opts.stream.onDelta })
+      : provider.complete(withSignal);
+  };
 
   let result = await run({
     messages,

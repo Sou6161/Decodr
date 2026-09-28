@@ -135,6 +135,7 @@ export class OpenAIProvider implements AIProvider {
       const body = { ...this.buildBody(request), stream: true };
       const iterator = (await client.chat.completions.create(
         body as unknown as OpenAI.Chat.Completions.ChatCompletionCreateParamsStreaming,
+        request.signal ? { signal: request.signal } : undefined,
       )) as unknown as AsyncIterable<OpenAI.Chat.Completions.ChatCompletionChunk>;
 
       let text = '';
@@ -178,6 +179,7 @@ export class OpenAIProvider implements AIProvider {
 
       const response = (await client.chat.completions.create(
         body as unknown as OpenAI.Chat.Completions.ChatCompletionCreateParamsNonStreaming,
+        request.signal ? { signal: request.signal } : undefined,
       )) as OpenAI.Chat.Completions.ChatCompletion;
 
       const message = response.choices[0]?.message;

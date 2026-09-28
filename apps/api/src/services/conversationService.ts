@@ -60,6 +60,8 @@ export const conversationService = {
     detailed?: boolean;
     /** Supplied by the streaming endpoint; the answer is still persisted identically. */
     stream?: ExplainStreamHandlers;
+    /** Aborts the model call if the reader stops the answer. */
+    signal?: AbortSignal;
   }): Promise<AskResponse> {
     const { repositoryId, conversationId, question, detailed } = params;
 
@@ -94,6 +96,7 @@ export const conversationService = {
       history,
       summary: summaryState.summary,
       ...(params.stream ? { stream: params.stream } : {}),
+      ...(params.signal ? { signal: params.signal } : {}),
     });
 
     const conversation =

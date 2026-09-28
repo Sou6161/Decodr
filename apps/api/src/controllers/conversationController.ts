@@ -7,6 +7,7 @@ import type {
 } from '@decodr/types';
 import { conversationService } from '../services/conversationService.js';
 import { AppError } from '../utils/AppError.js';
+import { logger } from '../utils/logger.js';
 
 const AskBodySchema = z.object({
   conversationId: z.string().min(1).optional(),
@@ -66,10 +67,20 @@ export const conversationController = {
       res.write(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`);
     };
 
-    // If the reader navigates away, stop paying for tokens nobody will see.
+    // If the reader stops the answer or navigates away, cancel the upstream
+    // call too. Previously this only muted the output — the model kept running
+    // and the tokens were still paid for.
     let aborted = false;
-    req.on('close', () => {
+    const controller = new AbortController();
+    // `res` not `req`: for a streaming response the request stream closes once
+    // its body has been read, so req's 'close' says nothing about whether the
+    // reader is still there. res emits 'close' when the connection actually
+    // ends — which is what "they pressed Stop" looks like from here.
+    res.on('close', () => {
+      if (aborted || res.writableEnded) return;
       aborted = true;
+      controller.abort();
+      logger.info('Explain stopped by the reader — upstream request cancelled');
     });
 
     try {
@@ -78,6 +89,7 @@ export const conversationController = {
         ...(conversationId ? { conversationId } : {}),
         question,
         ...(detailed !== undefined ? { detailed } : {}),
+        signal: controller.signal,
         stream: {
           onStart: (intent) => {
             if (!aborted) send('start', { intent });
@@ -98,9 +110,11 @@ export const conversationController = {
       });
       if (!aborted) send('done', result);
     } catch (err) {
+      // A stop is not a failure — the reader asked for it.
+      if (aborted) return;
       const message =
         err instanceof AppError ? err.message : 'Something went wrong generating the explanation.';
-      if (!aborted) send('error', { message });
+      send('error', { message });
     } finally {
       res.end();
     }

@@ -27,6 +27,7 @@ export function ExplainPage() {
   );
   const pendingQuestion = useRef('');
   const scrollAnchor = useRef<HTMLDivElement>(null);
+  const inputRef = useRef<HTMLTextAreaElement>(null);
 
   const setModePersisted = (m: Mode) => {
     setMode(m);
@@ -94,7 +95,15 @@ export function ExplainPage() {
           </div>
         )}
 
-        {!showEmpty && <ChatMessages messages={messages} />}
+        {!showEmpty && (
+          <ChatMessages
+            messages={messages}
+            onEdit={(content) => {
+              setInput(content);
+              inputRef.current?.focus();
+            }}
+          />
+        )}
 
         <AnimatePresence>
           {ask.isPending && (
@@ -148,6 +157,7 @@ export function ExplainPage() {
         <div className="rounded-2xl border border-border glass p-2 shadow-lg shadow-black/20">
           <div className="flex items-end gap-2">
             <textarea
+              ref={inputRef}
               value={input}
               onChange={(e) => setInput(e.target.value)}
               onKeyDown={(e) => {
@@ -161,14 +171,19 @@ export function ExplainPage() {
               placeholder={activeId ? 'Ask a follow-up…' : 'e.g. Explain how the Dashboard works'}
               className="max-h-32 min-h-[2.5rem] flex-1 resize-none bg-transparent px-3 py-2 text-sm text-foreground outline-none placeholder:text-subtle"
             />
-            <Button
-              type="submit"
-              disabled={
-                input.trim().length < 3 || input.length > MAX_QUESTION || ask.isPending
-              }
-            >
-              Ask
-            </Button>
+            {ask.isPending ? (
+              /* Stopping cancels the upstream model call, not just the display. */
+              <Button type="button" variant="secondary" onClick={() => ask.stop()}>
+                Stop
+              </Button>
+            ) : (
+              <Button
+                type="submit"
+                disabled={input.trim().length < 3 || input.length > MAX_QUESTION}
+              >
+                Ask
+              </Button>
+            )}
           </div>
 
           <div className="flex items-center gap-2 px-2 pb-0.5 pt-1">

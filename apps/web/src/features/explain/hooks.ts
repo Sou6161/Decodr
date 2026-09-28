@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import type { ConversationWithMessages } from '@decodr/types';
 import { askStream, conversationKeys, explainApi, type AskIntent } from './api';
@@ -37,6 +37,8 @@ export function useAsk(repoId: string) {
   // Set while the model is re-reading after opening files, so the UI can
   // explain why the text it was showing just cleared.
   const [rereading, setRereading] = useState(false);
+  // Held so the reader can stop an answer in progress.
+  const abortRef = useRef<AbortController | null>(null);
 
   const mutation = useMutation({
     mutationFn: (vars: { conversationId?: string; question: string; detailed?: boolean }) => {
@@ -45,6 +47,7 @@ export function useAsk(repoId: string) {
       setIntent(null);
       setContextFiles([]);
       setRereading(false);
+      abortRef.current = new AbortController();
       return askStream(repoId, vars, {
         onStart: setIntent,
         onContext: setContextFiles,
@@ -57,7 +60,7 @@ export function useAsk(repoId: string) {
           setStreamed('');
           setRereading(true);
         },
-      });
+      }, abortRef.current.signal);
     },
     onSuccess: ({ conversation, userMessage, assistantMessage }) => {
       queryClient.setQueryData<ConversationWithMessages>(
@@ -77,6 +80,15 @@ export function useAsk(repoId: string) {
       setRereading(false);
     },
     onError: (error) => {
+      // AbortError means the reader pressed Stop — not something to apologise for.
+      if (error instanceof Error && error.name === 'AbortError') {
+        setStreamed('');
+        setOpenedFiles([]);
+        setIntent(null);
+        setContextFiles([]);
+        setRereading(false);
+        return;
+      }
       const message =
         error instanceof ApiClientError
           ? error.apiError.message
@@ -92,7 +104,17 @@ export function useAsk(repoId: string) {
     },
   });
 
-  return Object.assign(mutation, { streamed, openedFiles, intent, contextFiles, rereading });
+  /** Cancels the answer in progress; the server cancels the model call too. */
+  const stop = () => abortRef.current?.abort();
+
+  return Object.assign(mutation, {
+    streamed,
+    openedFiles,
+    intent,
+    contextFiles,
+    rereading,
+    stop,
+  });
 }
 
 /** Deletes a conversation and refreshes the list. */

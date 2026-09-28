@@ -7,12 +7,19 @@ import { cn } from '@/utils/cn';
 
 const CONTEXT_PREVIEW = 5;
 
-export function ChatMessages({ messages }: { messages: Message[] }) {
+export function ChatMessages({
+  messages,
+  onEdit,
+}: {
+  messages: Message[];
+  /** Puts a past question back in the composer so it can be reworded and re-asked. */
+  onEdit?: (content: string) => void;
+}) {
   return (
     <div className="space-y-6">
       {messages.map((message) =>
         message.role === MessageRole.User ? (
-          <UserBubble key={message.id} content={message.content} />
+          <UserBubble key={message.id} content={message.content} {...(onEdit ? { onEdit } : {})} />
         ) : (
           <AssistantCard key={message.id} message={message} />
         ),
@@ -21,14 +28,57 @@ export function ChatMessages({ messages }: { messages: Message[] }) {
   );
 }
 
-function UserBubble({ content }: { content: string }) {
+/** Copy / edit actions that appear on hover, as in a normal chat client. */
+function MessageActions({
+  content,
+  onEdit,
+}: {
+  content: string;
+  onEdit?: (content: string) => void;
+}) {
+  const [copied, setCopied] = useState(false);
+  const copy = async () => {
+    try {
+      await navigator.clipboard.writeText(content);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1600);
+    } catch {
+      // Clipboard may be blocked; the text is still selectable.
+    }
+  };
+  const btn =
+    'rounded px-1.5 py-0.5 text-[11px] font-medium text-subtle transition-colors hover:bg-surface-raised hover:text-foreground';
   return (
-    <div className="flex justify-end">
+    <div className="mt-1 flex justify-end gap-1 opacity-0 transition-opacity group-hover:opacity-100 focus-within:opacity-100">
+      {onEdit && (
+        <button type="button" className={btn} onClick={() => onEdit(content)}>
+          Edit
+        </button>
+      )}
+      <button type="button" className={btn} onClick={() => void copy()}>
+        {copied ? 'Copied' : 'Copy'}
+      </button>
+    </div>
+  );
+}
+
+function UserBubble({
+  content,
+  onEdit,
+}: {
+  content: string;
+  onEdit?: (content: string) => void;
+}) {
+  return (
+    <div className="group flex flex-col items-end">
+      <div className="flex justify-end">
       {/* whitespace-pre-wrap: a multi-line question the user typed should keep
           the shape they gave it rather than collapsing into one run-on line. */}
-      <div className="max-w-[85%] whitespace-pre-wrap rounded-2xl rounded-br-md border border-primary/30 bg-primary/10 px-4 py-2.5 text-sm leading-relaxed text-foreground">
-        {content}
+        <div className="max-w-[85%] whitespace-pre-wrap rounded-2xl rounded-br-md border border-primary/30 bg-primary/10 px-4 py-2.5 text-sm leading-relaxed text-foreground">
+          {content}
+        </div>
       </div>
+      <MessageActions content={content} {...(onEdit ? { onEdit } : {})} />
     </div>
   );
 }
