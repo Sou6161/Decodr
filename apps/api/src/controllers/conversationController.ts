@@ -10,7 +10,14 @@ import { AppError } from '../utils/AppError.js';
 
 const AskBodySchema = z.object({
   conversationId: z.string().min(1).optional(),
-  question: z.string().min(3, 'Question is too short').max(500, 'Question is too long'),
+  // 500 was far too tight: a considered architecture question — "walk me through
+  // the request path, and tell me where Socket.IO fits" — runs past it easily.
+  // This is generous but still bounded; at ~4 chars per token it costs about
+  // 1k tokens, negligible against the context budget.
+  question: z
+    .string()
+    .min(3, 'Question is too short')
+    .max(4000, 'Question is too long — keep it under 4000 characters'),
   detailed: z.boolean().optional(),
 });
 
@@ -72,6 +79,12 @@ export const conversationController = {
         question,
         ...(detailed !== undefined ? { detailed } : {}),
         stream: {
+          onStart: (intent) => {
+            if (!aborted) send('start', { intent });
+          },
+          onContext: (paths) => {
+            if (!aborted) send('context', { paths });
+          },
           onDelta: (text) => {
             if (!aborted) send('delta', { text });
           },

@@ -19,7 +19,14 @@ export const explainApi = {
 };
 
 /** Events the streaming endpoint emits, in the order they arrive. */
+/** What kind of message the server decided this is. */
+export type AskIntent = 'smalltalk' | 'overview' | 'code';
+
 export interface AskStreamHandlers {
+  /** Fired before any slow work, so the UI can describe it honestly. */
+  onStart: (intent: AskIntent) => void;
+  /** Files retrieval selected, available within milliseconds of asking. */
+  onContext: (paths: string[]) => void;
   onDelta: (text: string) => void;
   onFiles: (paths: string[]) => void;
   /** Drop what has been shown so far — it was preamble before a tool call. */
@@ -80,7 +87,9 @@ export async function askStream(
       if (!event || !raw) continue;
       const data = JSON.parse(raw) as Record<string, never>;
 
-      if (event === 'delta') handlers.onDelta(data.text as unknown as string);
+      if (event === 'start') handlers.onStart(data.intent as unknown as AskIntent);
+      else if (event === 'context') handlers.onContext(data.paths as unknown as string[]);
+      else if (event === 'delta') handlers.onDelta(data.text as unknown as string);
       else if (event === 'files') handlers.onFiles(data.paths as unknown as string[]);
       else if (event === 'reset') handlers.onReset();
       else if (event === 'done') done = data as unknown as AskResponse;

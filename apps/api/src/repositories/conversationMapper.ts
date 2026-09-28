@@ -17,7 +17,9 @@ export function toMessageDto(model: MessageModel): Message {
     content: model.content,
     contextPaths: model.contextPaths,
     openedPaths: model.openedPaths,
-    model: model.model,
+    // The model name is kept in the database for debugging but deliberately not
+    // sent to the browser — which provider answers is not the reader's concern,
+    // and shipping it means it shows up in devtools whatever the UI renders.
     createdAt: model.createdAt.toISOString(),
   };
 }

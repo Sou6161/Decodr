@@ -15,6 +15,7 @@ import { explainRepository, type ExplainStreamHandlers } from './explanationServ
 import type { HistoryTurn } from '../ai/promptBuilder.js';
 import { maybeExtendSummary, type SummaryState } from '../ai/summarizer.js';
 import { AppError } from '../utils/AppError.js';
+import { logger } from '../utils/logger.js';
 
 /** First line of the question, trimmed, as the conversation title. */
 function deriveTitle(question: string): string {
@@ -66,6 +67,7 @@ export const conversationService = {
     // load its turns as the model's memory of the thread.
     let history: HistoryTurn[] = [];
     let summaryState: SummaryState = { summary: null, summarizedCount: 0 };
+    let pendingSummary: { conversationId: string; history: HistoryTurn[] } | null = null;
     if (conversationId) {
       const existing = await conversationRepository.findWithMessages(conversationId, repositoryId);
       if (!existing) {
@@ -80,17 +82,10 @@ export const conversationService = {
         summarizedCount: existing.summarizedCount,
       };
 
-      // Fold any turns that have aged out of the verbatim window into the rolling
-      // summary. Usually a no-op; only fires once a batch has accumulated.
-      const extended = await maybeExtendSummary(history, summaryState);
-      if (extended) {
-        summaryState = extended;
-        await conversationRepository.saveSummary(
-          conversationId,
-          extended.summary,
-          extended.summarizedCount,
-        );
-      }
+      // Extending the rolling summary is work for the NEXT turn, so it must not
+      // delay this one. It was awaited here, adding a whole extra model call in
+      // front of every question on a long thread. Deferred below instead.
+      pendingSummary = { conversationId, history };
     }
 
     // Generate the answer before writing anything.
@@ -119,6 +114,20 @@ export const conversationService = {
       model: result.model,
     });
     await conversationRepository.touch(conversation);
+
+    // Now that the reader has their answer, catch the summary up in the
+    // background. Failure is logged and ignored — it only affects how much
+    // older context the next turn gets.
+    if (pendingSummary) {
+      const { conversationId: cid, history: turns } = pendingSummary;
+      void maybeExtendSummary(turns, summaryState)
+        .then((extended) =>
+          extended
+            ? conversationRepository.saveSummary(cid, extended.summary, extended.summarizedCount)
+            : undefined,
+        )
+        .catch((err) => logger.error('Background summary failed', err));
+    }
 
     const updated = await conversationRepository.findWithCount(conversation, repositoryId);
     return {

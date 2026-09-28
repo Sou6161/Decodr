@@ -12,6 +12,9 @@ import { cn } from '@/utils/cn';
 
 type Mode = 'quick' | 'detailed';
 
+/** Must match the server's schema, or long questions fail only after sending. */
+const MAX_QUESTION = 4000;
+
 export function ExplainPage() {
   const repo = useOutletContext<Repository>();
   const [params, setParams] = useSearchParams();
@@ -45,7 +48,7 @@ export function ExplainPage() {
 
   const submit = (question: string) => {
     const q = question.trim();
-    if (q.length < 3 || ask.isPending) return;
+    if (q.length < 3 || q.length > MAX_QUESTION || ask.isPending) return;
     pendingQuestion.current = q;
     setInput('');
     ask.mutate(
@@ -102,6 +105,11 @@ export function ExplainPage() {
                 </div>
               </div>
               <Card className="mt-4 p-5">
+                {ask.rereading && ask.streamed === '' && (
+                  <p className="mb-2 text-[11px] text-subtle">
+                    Opened more files — starting the answer again with them.
+                  </p>
+                )}
                 {ask.streamed ? (
                   <>
                     <Markdown content={ask.streamed} />
@@ -110,9 +118,13 @@ export function ExplainPage() {
                 ) : (
                   <div className="flex items-center gap-2 text-sm text-muted">
                     <Spinner className="h-4 w-4 text-primary" />
-                    {mode === 'detailed'
-                      ? 'Reading the codebase in depth…'
-                      : 'Reading the relevant files…'}
+                    {ask.rereading
+                      ? 'Re-reading with the new files…'
+                      : ask.contextFiles.length > 0
+                        ? `Read ${ask.contextFiles.length} file${
+                            ask.contextFiles.length === 1 ? '' : 's'
+                          } · writing the answer…`
+                        : waitingLabel(ask.intent, mode)}
                   </div>
                 )}
                 {ask.openedFiles.length > 0 && (
@@ -145,10 +157,16 @@ export function ExplainPage() {
                 }
               }}
               rows={1}
+              maxLength={MAX_QUESTION}
               placeholder={activeId ? 'Ask a follow-up…' : 'e.g. Explain how the Dashboard works'}
               className="max-h-32 min-h-[2.5rem] flex-1 resize-none bg-transparent px-3 py-2 text-sm text-foreground outline-none placeholder:text-subtle"
             />
-            <Button type="submit" disabled={input.trim().length < 3 || ask.isPending}>
+            <Button
+              type="submit"
+              disabled={
+                input.trim().length < 3 || input.length > MAX_QUESTION || ask.isPending
+              }
+            >
               Ask
             </Button>
           </div>
@@ -176,11 +194,36 @@ export function ExplainPage() {
                 ? 'Full context, exhaustive answer — slower.'
                 : 'Focused answer — fast.'}
             </span>
+            {/* Only appears as the limit gets close, so it is not noise. */}
+            {input.length > MAX_QUESTION * 0.8 && (
+              <span
+                className={cn(
+                  'ml-auto text-[11px] tabular-nums',
+                  input.length > MAX_QUESTION ? 'text-danger' : 'text-subtle',
+                )}
+              >
+                {input.length.toLocaleString()} / {MAX_QUESTION.toLocaleString()}
+              </span>
+            )}
           </div>
         </div>
       </form>
     </div>
   );
+}
+
+/**
+ * What to show while waiting. The server says up front what kind of message this
+ * is, so a greeting no longer claims the codebase is being read.
+ */
+function waitingLabel(intent: Mode | string | null, mode: Mode): string {
+  if (intent === 'smalltalk') return 'Typing…';
+  if (intent === 'overview') return 'Getting an overall picture of the project…';
+  if (intent === 'code') {
+    return mode === 'detailed' ? 'Reading the codebase in depth…' : 'Reading the relevant files…';
+  }
+  // Intent not known yet — say nothing that might turn out to be false.
+  return 'Thinking…';
 }
 
 /** Example questions, seeded with the graph's most-central component. */

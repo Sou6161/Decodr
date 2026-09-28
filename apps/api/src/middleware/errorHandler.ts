@@ -29,9 +29,12 @@ export const errorHandler: ErrorRequestHandler = (err, _req, res, _next) => {
       const key = issue.path.join('.') || '_';
       (details[key] ??= []).push(issue.message);
     }
+    // Surface the real reason. "Request validation failed" told the reader
+    // nothing, leaving them to guess which field was wrong and why.
+    const reasons = Object.values(details).flat();
     apiError = {
       code: 'VALIDATION_ERROR',
-      message: 'Request validation failed',
+      message: reasons.length > 0 ? reasons.join('. ') : 'Request validation failed',
       details,
     };
   } else {

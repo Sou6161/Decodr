@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import type { ConversationWithMessages } from '@decodr/types';
-import { askStream, conversationKeys, explainApi } from './api';
+import { askStream, conversationKeys, explainApi, type AskIntent } from './api';
 import { toast } from '@/stores/toastStore';
 import { ApiClientError } from '@/services/apiClient';
 
@@ -32,15 +32,31 @@ export function useAsk(repoId: string) {
   // The answer as it arrives, so the page can render it before it is complete.
   const [streamed, setStreamed] = useState('');
   const [openedFiles, setOpenedFiles] = useState<string[]>([]);
+  const [intent, setIntent] = useState<AskIntent | null>(null);
+  const [contextFiles, setContextFiles] = useState<string[]>([]);
+  // Set while the model is re-reading after opening files, so the UI can
+  // explain why the text it was showing just cleared.
+  const [rereading, setRereading] = useState(false);
 
   const mutation = useMutation({
     mutationFn: (vars: { conversationId?: string; question: string; detailed?: boolean }) => {
       setStreamed('');
       setOpenedFiles([]);
+      setIntent(null);
+      setContextFiles([]);
+      setRereading(false);
       return askStream(repoId, vars, {
-        onDelta: (text) => setStreamed((prev) => prev + text),
+        onStart: setIntent,
+        onContext: setContextFiles,
+        onDelta: (text) => {
+          setRereading(false);
+          setStreamed((prev) => prev + text);
+        },
         onFiles: (paths) => setOpenedFiles((prev) => [...prev, ...paths]),
-        onReset: () => setStreamed(''),
+        onReset: () => {
+          setStreamed('');
+          setRereading(true);
+        },
       });
     },
     onSuccess: ({ conversation, userMessage, assistantMessage }) => {
@@ -56,6 +72,9 @@ export function useAsk(repoId: string) {
       // The persisted message now renders from cache; drop the partial copy.
       setStreamed('');
       setOpenedFiles([]);
+      setIntent(null);
+      setContextFiles([]);
+      setRereading(false);
     },
     onError: (error) => {
       const message =
@@ -67,10 +86,13 @@ export function useAsk(repoId: string) {
       toast.error('Explanation failed', message);
       setStreamed('');
       setOpenedFiles([]);
+      setIntent(null);
+      setContextFiles([]);
+      setRereading(false);
     },
   });
 
-  return Object.assign(mutation, { streamed, openedFiles });
+  return Object.assign(mutation, { streamed, openedFiles, intent, contextFiles, rereading });
 }
 
 /** Deletes a conversation and refreshes the list. */

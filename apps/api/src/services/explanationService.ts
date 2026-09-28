@@ -11,7 +11,7 @@ import {
   type HistoryTurn,
   type RepositoryFacts,
 } from '../ai/promptBuilder.js';
-import { classifyQuestion } from '../ai/intent.js';
+import { classifyQuestion, type QuestionIntent } from '../ai/intent.js';
 import { READ_FILES_TOOL, runReadFiles } from '../ai/fileReader.js';
 import type { ChatMessage } from '../ai/types.js';
 import { logger } from '../utils/logger.js';
@@ -58,6 +58,7 @@ export async function explainRepository(
 
   const history = opts.history ?? [];
   const intent = classifyQuestion(trimmed);
+  opts.stream?.onStart(intent);
 
   // Greetings and "what can you do" are not code questions. Sending them through
   // keyword retrieval used to match files that merely contained the letters of
@@ -107,6 +108,8 @@ export async function explainRepository(
       "Couldn't find code relevant to that question. Try naming a component, or ask about routing.",
     );
   }
+
+  opts.stream?.onContext(context.files.map((f) => f.path));
 
   const messages: ChatMessage[] = buildMessages(context, trimmed, {
     detailed,
@@ -194,6 +197,14 @@ export async function explainRepository(
 
 /** Callbacks a caller supplies to receive the answer incrementally. */
 export interface ExplainStreamHandlers {
+  /**
+   * Fired once the kind of message is known, before any work that takes time.
+   * Lets the reader show what is actually happening — saying "reading the
+   * codebase" while answering "hi" is simply untrue.
+   */
+  onStart: (intent: QuestionIntent) => void;
+  /** Fired once retrieval has chosen files — within milliseconds of the ask. */
+  onContext: (paths: string[]) => void;
   onDelta: (text: string) => void;
   /** Fired when the model opens files mid-answer, so the UI can say so. */
   onFiles: (paths: string[]) => void;

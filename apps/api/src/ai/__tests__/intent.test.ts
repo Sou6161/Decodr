@@ -8,6 +8,19 @@ describe('classifyQuestion', () => {
     }
   });
 
+  it('handles any term of address after a greeting', () => {
+    // Listing these words one by one was a losing game — "man" and "dude" were
+    // both missed at first, and a greeting reached the code-explanation path.
+    for (const q of ['hi man', 'hey dude', 'hello buddy', 'hi bro', 'yo man', 'hi sir']) {
+      expect(classifyQuestion(q), q).toBe('smalltalk');
+    }
+  });
+
+  it('still routes a greeting followed by an actual request to code', () => {
+    expect(classifyQuestion('hi explain routing')).toBe('code');
+    expect(classifyQuestion('hey show me the router')).toBe('code');
+  });
+
   it('treats questions about the assistant as smalltalk', () => {
     expect(classifyQuestion('what can you do')).toBe('smalltalk');
     expect(classifyQuestion('who are you')).toBe('smalltalk');
