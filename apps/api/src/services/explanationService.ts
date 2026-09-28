@@ -166,16 +166,29 @@ export async function explainRepository(
     // Anything streamed before the tool call is not part of the final answer.
     opts.stream?.onReset();
 
+    const canReadMore = round < MAX_TOOL_ROUNDS - 1 && readBudget > 0;
+    if (!canReadMore) {
+      // Removing the tool silently made the model emit the call as plain text —
+      // it still wanted to read, and with no tool available it wrote out
+      // "<tool_call>..." into the answer. Tell it the budget is spent instead.
+      messages.push({
+        role: 'system',
+        content:
+          'No further file reads are available. Answer the question now using the files you ' +
+          'already have. If something is missing, say which file you would need and why — ' +
+          'do not write out a tool call.',
+      });
+    }
+
     result = await run({
       messages,
       temperature: 0.4,
       maxTokens: detailed ? 9000 : 1400,
-      // Stop offering the tool on the final round so the model must answer.
-      ...(round < MAX_TOOL_ROUNDS - 1 && readBudget > 0 ? { tools: [READ_FILES_TOOL] } : {}),
+      ...(canReadMore ? { tools: [READ_FILES_TOOL] } : {}),
     });
   }
 
-  const answer = result.text.trim();
+  const answer = stripTextToolCalls(result.text).trim();
   // A model that spends its last round on tool calls, or returns nothing, would
   // otherwise be persisted as a blank message the reader cannot act on.
   if (answer.length === 0) {
@@ -193,6 +206,23 @@ export async function explainRepository(
     contextPaths: [...seen],
     openedPaths: opened,
   };
+}
+
+/**
+ * Removes tool calls a model wrote as prose.
+ *
+ * Some models — open-weights ones especially — emit `<tool_call>…</tool_call>`
+ * or `<function=…>` into the message body rather than using the structured
+ * tool-calling field. That is machine syntax leaking into a human answer, so it
+ * is stripped before anything is shown or saved.
+ */
+export function stripTextToolCalls(text: string): string {
+  return text
+    .replace(/<tool_call>[\s\S]*?<\/tool_call>/gi, '')
+    .replace(/<function=[\s\S]*?<\/function>/gi, '')
+    .replace(/<\|?(?:tool_call|function_call)\|?>[\s\S]*?<\|?\/(?:tool_call|function_call)\|?>/gi, '')
+    .replace(/\n{3,}/g, '\n\n')
+    .trim();
 }
 
 /** Callbacks a caller supplies to receive the answer incrementally. */
