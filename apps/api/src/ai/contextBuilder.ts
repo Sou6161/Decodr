@@ -8,6 +8,8 @@ import { componentRepository } from '../repositories/componentRepository.js';
 import type { ComponentWithPath } from '../repositories/componentRepository.js';
 import { edgeRepository } from '../repositories/edgeRepository.js';
 import { routeRepository } from '../repositories/routeRepository.js';
+import { hookRepository } from '../repositories/hookRepository.js';
+import { buildRepoMap } from './repoMap.js';
 import { AppError } from '../utils/AppError.js';
 
 /**
@@ -130,13 +132,15 @@ export async function buildExplanationContext(
     throw AppError.badRequest('Repository is still processing. Try again once it is ready.');
   }
 
-  const [allFiles, components, edges, routes] = await Promise.all([
+  const [allFiles, components, edges, routes, hooks] = await Promise.all([
     fileRepository.listByRepository(repositoryId),
     componentRepository.listByRepository(repositoryId),
     edgeRepository.listByRepository(repositoryId),
     routeRepository.listByRepository(repositoryId),
+    hookRepository.listByRepository(repositoryId),
   ]);
 
+  const fileById = new Map(allFiles.map((f) => [f.id, f.path]));
   const keywords = extractKeywords(question);
 
   // "Which AI / database / libraries does this use?" is answered by the manifest,
@@ -242,7 +246,29 @@ export async function buildExplanationContext(
     contentByPath,
   );
 
-  return { focusName, files, relatedComponents };
+  // Component edges are between components; collapse them to file-level imports
+  // so each map line shows what that file actually depends on.
+  const componentFile = new Map(components.map((c) => [c.id, c.file.path]));
+  const fileImports = edges
+    .map((e) => ({ from: componentFile.get(e.sourceId), to: componentFile.get(e.targetId) }))
+    .filter((e): e is { from: string; to: string } => Boolean(e.from && e.to && e.from !== e.to));
+
+  const hooksByPath = hooks
+    .map((h) => {
+      const path = fileById.get(h.fileId);
+      return path ? { name: h.name, file: { path } } : null;
+    })
+    .filter((h): h is { name: string; file: { path: string } } => h !== null);
+
+  const repoMap = buildRepoMap({
+    files: allFiles.map((f) => ({ path: f.path, lineCount: f.lineCount })),
+    components,
+    hooks: hooksByPath,
+    routes: routes.map((r) => ({ path: r.path, filePath: r.filePath })),
+    imports: fileImports,
+  });
+
+  return { focusName, files, relatedComponents, repoMap };
 }
 
 /**

@@ -7,6 +7,7 @@ import { SparkIcon } from '@/components/icons';
 import { useRepositoryGraph } from '@/features/graph/hooks';
 import { useAsk, useConversation } from '@/features/explain/hooks';
 import { ChatMessages } from '@/features/explain/ChatMessages';
+import { Markdown } from '@/features/explain/Markdown';
 import { cn } from '@/utils/cn';
 
 type Mode = 'quick' | 'detailed';
@@ -101,12 +102,28 @@ export function ExplainPage() {
                 </div>
               </div>
               <Card className="mt-4 p-5">
-                <div className="flex items-center gap-2 text-sm text-muted">
-                  <Spinner className="h-4 w-4 text-primary" />
-                  {mode === 'detailed'
-                    ? 'Reading the codebase in depth…'
-                    : 'Reading the relevant files…'}
-                </div>
+                {ask.streamed ? (
+                  <>
+                    <Markdown content={ask.streamed} />
+                    <span className="ml-0.5 inline-block h-4 w-[2px] animate-pulse bg-primary align-text-bottom" />
+                  </>
+                ) : (
+                  <div className="flex items-center gap-2 text-sm text-muted">
+                    <Spinner className="h-4 w-4 text-primary" />
+                    {mode === 'detailed'
+                      ? 'Reading the codebase in depth…'
+                      : 'Reading the relevant files…'}
+                  </div>
+                )}
+                {ask.openedFiles.length > 0 && (
+                  <p className="mt-3 border-t border-border pt-2 text-[11px] text-subtle">
+                    Opened {ask.openedFiles.length} more file
+                    {ask.openedFiles.length === 1 ? '' : 's'}:{' '}
+                    <span className="font-mono text-primary">
+                      {ask.openedFiles.join(', ')}
+                    </span>
+                  </p>
+                )}
               </Card>
             </motion.div>
           )}

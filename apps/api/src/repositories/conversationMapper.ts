@@ -16,6 +16,7 @@ export function toMessageDto(model: MessageModel): Message {
     role: model.role as MessageRole,
     content: model.content,
     contextPaths: model.contextPaths,
+    openedPaths: model.openedPaths,
     model: model.model,
     createdAt: model.createdAt.toISOString(),
   };

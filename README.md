@@ -2,7 +2,9 @@
 
 **Understand any React codebase in minutes.**
 
-Decodr is an intelligent codebase-analysis platform for React + TypeScript projects. Upload a repository as a ZIP and Decodr statically analyzes it (via the TypeScript Compiler API — never regex), models its architecture as a component dependency graph, surfaces repository insights on a dashboard, and answers architecture questions with **context-aware** AI explanations that only ever see the files relevant to your question.
+Decodr is a codebase-analysis platform for React + TypeScript projects. Pick a project folder and Decodr parses it with the TypeScript Compiler API (never regex), models the architecture as a component dependency graph, surfaces insights on a dashboard, and answers questions about the code with explanations grounded in the files that actually matter.
+
+**Live:** https://decodr-web.imsrb.in
 
 > This is a portfolio project built to demonstrate clean architecture, strong typing, and pragmatic AI integration. The AI is one module — most of the intelligence comes from static analysis and graph modeling.
 
@@ -10,12 +12,13 @@ Decodr is an intelligent codebase-analysis platform for React + TypeScript proje
 
 ## Features (MVP)
 
-1. **Repository upload** — ZIP upload with extraction and live scan progress.
-2. **React project parser** — TypeScript Compiler API extracts components, imports/exports, custom hooks, and React Router routes.
-3. **Component relationship graph** — dependency graph persisted in PostgreSQL and visualized with React Flow (zoom, pan, search, node metadata).
-4. **Repository dashboard** — files, components, hooks, routes, largest/most-imported components, folder structure.
-5. **Intelligent code explanation** — locates a feature, builds a focused context from related files only, and asks the LLM to explain it.
-6. **Professional UX** — skeletons, loading/error/empty states, smooth transitions, fully responsive dark UI.
+1. **Folder upload** — pick a project folder; the browser walks it, skips `node_modules` and build output, and uploads only source files and manifests. ZIP upload is also supported.
+2. **Static parser** — the TypeScript Compiler API extracts components, imports/exports, custom hooks, and file-based routes (Expo Router, Next App Router, Next Pages Router). Syntax-only, so a project parses without installing its dependencies.
+3. **Component graph** — dependency graph persisted in PostgreSQL and visualised with React Flow.
+4. **Dashboard** — files, components, hooks, routes, largest and most-imported components, folder structure.
+5. **Feature map** — one card per feature area, components sized by line count.
+6. **Explain** — ask about the code and get an answer grounded in real source, in Quick or Detailed mode, with conversation memory across turns.
+7. **Session isolation** — no login. Each visitor gets a 256-bit token in an httpOnly cookie and only ever sees their own uploads, which are deleted automatically after 48 hours.
 
 ---
 
@@ -26,7 +29,8 @@ Decodr is an intelligent codebase-analysis platform for React + TypeScript proje
 | Frontend | React 19, TypeScript, Vite, Tailwind CSS v4, React Router v7, Zustand, TanStack Query, React Flow, dagre, Framer Motion (all UI primitives hand-built) |
 | Backend  | Node.js, Express, TypeScript |
 | Database | PostgreSQL + Prisma ORM |
-| AI       | Provider abstraction (OpenAI-compatible; OpenRouter by default — Claude / Gemini / Ollama as future providers) |
+| AI       | OpenAI `gpt-4o-mini` behind a provider abstraction (any OpenAI-compatible endpoint) |
+| Hosting  | Vercel (web), Render (API), Neon (database) |
 
 ---
 
@@ -79,7 +83,7 @@ src/
 
 - **Node.js ≥ 20** (developed on Node 25)
 - **PostgreSQL ≥ 14** running locally (developed on PostgreSQL 17 via Homebrew)
-- An **OpenAI API key** (only needed for Feature 5 — the rest works without it)
+- An **API key** for explanations (everything except Explain works without one)
 
 ---
 
@@ -114,8 +118,28 @@ npm run dev
 | `npm run typecheck` | Typecheck all workspaces |
 | `npm run db:migrate` | Apply Prisma migrations |
 | `npm run db:studio` | Open Prisma Studio |
+| `npm test` | Run the test suite (vitest) |
 
 ---
+
+## How the AI reaches the whole codebase
+
+A mid-size project is 150k–600k tokens of source — past the model's context window, and expensive to send on every message. Decodr gets whole-repo reach a different way:
+
+**Graph-driven retrieval, no embeddings.** A question is scored against component names and file paths, the best match becomes the focus, and the import graph is walked outward to pull in its neighbours:
+
+```ts
+const outgoing = edges.filter((e) => e.sourceId === focus.id);
+const incoming = edges.filter((e) => e.targetId === focus.id);
+```
+
+Those files are sent in full — 8 in Quick mode, 34 in Detailed — under a hard character budget.
+
+**A project map.** Every file in the repository is listed on one line each (path, size, what it declares, what it imports) for roughly 1% of the tokens the source would cost, so the model knows what exists even though it has only read a few files.
+
+**On-demand file reads.** The model can call a `read_files` tool to open any path from the map mid-answer, bounded to 3 rounds and a read budget. Retrieval guesses up front; this is the escape hatch when it guesses wrong.
+
+Source text is stored in PostgreSQL at analysis time, so explanations keep working after the host wipes its ephemeral disk.
 
 ## Architecture principles
 
@@ -126,4 +150,4 @@ npm run dev
 
 ## Roadmap (post-MVP)
 
-Auth, GitHub import, embeddings/pgvector, background jobs, dead-code & complexity analysis, multi-language support. These are intentionally left as extension points.
+Languages beyond React/TypeScript (the parser sits behind an interface), an MCP server so the analysis works inside coding agents, GitHub import, and streaming responses.

@@ -14,6 +14,8 @@ export interface Message {
   content: string;
   /** Repo-relative files sent as context (assistant messages only). */
   contextPaths: string[];
+  /** Subset of contextPaths the model opened itself, rather than retrieval choosing. */
+  openedPaths: string[];
   /** Model that produced the message (assistant messages only). */
   model: string | null;
   createdAt: ISODateString;

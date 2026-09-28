@@ -36,6 +36,63 @@ export const conversationController = {
     res.json(body);
   },
 
+  /**
+   * Streams the answer over Server-Sent Events.
+   *
+   * The same service runs, so the conversation is persisted identically; the
+   * only difference is that text reaches the browser as it is generated instead
+   * of after the whole answer is ready. A question that needs a file read can
+   * take a minute, and a spinner for that long reads as a hang.
+   */
+  async askStream(req: Request, res: Response): Promise<void> {
+    const { conversationId, question, detailed } = AskBodySchema.parse(req.body);
+
+    res.writeHead(200, {
+      'Content-Type': 'text/event-stream; charset=utf-8',
+      'Cache-Control': 'no-cache, no-transform',
+      Connection: 'keep-alive',
+      // Proxies that buffer would defeat the point of streaming.
+      'X-Accel-Buffering': 'no',
+    });
+
+    const send = (event: string, data: unknown): void => {
+      res.write(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`);
+    };
+
+    // If the reader navigates away, stop paying for tokens nobody will see.
+    let aborted = false;
+    req.on('close', () => {
+      aborted = true;
+    });
+
+    try {
+      const result = await conversationService.ask({
+        repositoryId: requireParam(req, 'id'),
+        ...(conversationId ? { conversationId } : {}),
+        question,
+        ...(detailed !== undefined ? { detailed } : {}),
+        stream: {
+          onDelta: (text) => {
+            if (!aborted) send('delta', { text });
+          },
+          onFiles: (paths) => {
+            if (!aborted) send('files', { paths });
+          },
+          onReset: () => {
+            if (!aborted) send('reset', {});
+          },
+        },
+      });
+      if (!aborted) send('done', result);
+    } catch (err) {
+      const message =
+        err instanceof AppError ? err.message : 'Something went wrong generating the explanation.';
+      if (!aborted) send('error', { message });
+    } finally {
+      res.end();
+    }
+  },
+
   async ask(req: Request, res: Response): Promise<void> {
     const { conversationId, question, detailed } = AskBodySchema.parse(req.body);
     const body: AskResponse = await conversationService.ask({

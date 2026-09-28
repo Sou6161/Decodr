@@ -15,6 +15,17 @@ export const fileRepository = {
     });
   },
 
+  /** Fetches specific files by path, for on-demand reads during an answer. */
+  findByPaths(
+    repositoryId: string,
+    paths: string[],
+  ): Promise<{ path: string; content: string | null }[]> {
+    return prisma.file.findMany({
+      where: { repositoryId, path: { in: paths } },
+      select: { path: true, content: true },
+    });
+  },
+
   deleteByRepository(repositoryId: string): Promise<Prisma.BatchPayload> {
     return prisma.file.deleteMany({ where: { repositoryId } });
   },

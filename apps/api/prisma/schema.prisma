@@ -173,6 +173,9 @@ model Message {
 
   /// For assistant messages: the focused context files sent to the model.
   contextPaths String[] @default([])
+  /// Of those, the files the model chose to open itself via the read_files tool,
+  /// rather than ones retrieval picked up front.
+  openedPaths  String[] @default([])
   /// The model that produced an assistant message.
   model String?
 

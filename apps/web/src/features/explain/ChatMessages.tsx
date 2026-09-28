@@ -3,6 +3,7 @@ import type { Message } from '@decodr/types';
 import { MessageRole } from '@decodr/types';
 import { Badge, Card } from '@/components/ui';
 import { Markdown } from './Markdown';
+import { cn } from '@/utils/cn';
 
 const CONTEXT_PREVIEW = 5;
 
@@ -32,6 +33,9 @@ function UserBubble({ content }: { content: string }) {
 
 function AssistantCard({ message }: { message: Message }) {
   const [expanded, setExpanded] = useState(false);
+  // Files the model went and fetched mid-answer, highlighted so the difference
+  // from up-front retrieval is visible.
+  const opened = new Set(message.openedPaths ?? []);
   const total = message.contextPaths.length;
   const shown = expanded ? message.contextPaths : message.contextPaths.slice(0, CONTEXT_PREVIEW);
   const hidden = total - shown.length;
@@ -43,10 +47,24 @@ function AssistantCard({ message }: { message: Message }) {
         <div className="mt-4 border-t border-border pt-3">
           <p className="mb-2 text-[11px] uppercase tracking-wide text-subtle">
             Context · {total} file{total === 1 ? '' : 's'}
+            {opened.size > 0 && (
+              <span className="text-primary">
+                {' '}
+                · {opened.size} opened while answering
+              </span>
+            )}
           </p>
           <div className="flex flex-wrap items-center gap-1.5">
             {shown.map((path) => (
-              <Badge key={path} className="font-mono">
+              <Badge
+                key={path}
+                className={cn('font-mono', opened.has(path) && 'border-primary/40 text-primary')}
+                title={
+                  opened.has(path)
+                    ? 'Decodr opened this file while answering'
+                    : 'Selected before answering'
+                }
+              >
                 {path}
               </Badge>
             ))}

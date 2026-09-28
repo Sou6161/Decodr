@@ -27,5 +27,11 @@ repositoryRouter.get('/:id/dashboard', owned, asyncHandler(repositoryController.
 // Persistent explanation conversations
 repositoryRouter.get('/:id/conversations', owned, asyncHandler(conversationController.list));
 repositoryRouter.post('/:id/conversations/ask', owned, askLimiter, asyncHandler(conversationController.ask));
+repositoryRouter.post(
+  '/:id/conversations/ask/stream',
+  owned,
+  askLimiter,
+  asyncHandler(conversationController.askStream),
+);
 repositoryRouter.get('/:id/conversations/:cid', owned, asyncHandler(conversationController.detail));
 repositoryRouter.delete('/:id/conversations/:cid', owned, asyncHandler(conversationController.remove));

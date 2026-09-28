@@ -11,7 +11,7 @@ import {
   toConversationWithMessagesDto,
   toMessageDto,
 } from '../repositories/conversationMapper.js';
-import { explainRepository } from './explanationService.js';
+import { explainRepository, type ExplainStreamHandlers } from './explanationService.js';
 import type { HistoryTurn } from '../ai/promptBuilder.js';
 import { maybeExtendSummary, type SummaryState } from '../ai/summarizer.js';
 import { AppError } from '../utils/AppError.js';
@@ -57,6 +57,8 @@ export const conversationService = {
     conversationId?: string;
     question: string;
     detailed?: boolean;
+    /** Supplied by the streaming endpoint; the answer is still persisted identically. */
+    stream?: ExplainStreamHandlers;
   }): Promise<AskResponse> {
     const { repositoryId, conversationId, question, detailed } = params;
 
@@ -96,6 +98,7 @@ export const conversationService = {
       detailed: detailed ?? false,
       history,
       summary: summaryState.summary,
+      ...(params.stream ? { stream: params.stream } : {}),
     });
 
     const conversation =
@@ -112,6 +115,7 @@ export const conversationService = {
       role: MessageRole.Assistant,
       content: result.answer,
       contextPaths: result.contextPaths,
+      openedPaths: result.openedPaths,
       model: result.model,
     });
     await conversationRepository.touch(conversation);

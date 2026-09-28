@@ -5,7 +5,18 @@ import {
   DETAILED_LIMITS,
   QUICK_LIMITS,
 } from '../ai/contextBuilder.js';
-import { buildMessages, type HistoryTurn } from '../ai/promptBuilder.js';
+import {
+  buildChatMessages,
+  buildMessages,
+  type HistoryTurn,
+  type RepositoryFacts,
+} from '../ai/promptBuilder.js';
+import { classifyQuestion } from '../ai/intent.js';
+import { READ_FILES_TOOL, runReadFiles } from '../ai/fileReader.js';
+import type { ChatMessage } from '../ai/types.js';
+import { logger } from '../utils/logger.js';
+import { repositoryRepository } from '../repositories/repositoryRepository.js';
+import { componentRepository } from '../repositories/componentRepository.js';
 import { AppError } from '../utils/AppError.js';
 
 /**
@@ -20,7 +31,13 @@ import { AppError } from '../utils/AppError.js';
 export async function explainRepository(
   repositoryId: string,
   question: string,
-  opts: { detailed?: boolean; history?: HistoryTurn[]; summary?: string | null } = {},
+  opts: {
+    detailed?: boolean;
+    history?: HistoryTurn[];
+    summary?: string | null;
+    /** When present the answer is streamed through these callbacks as it is produced. */
+    stream?: ExplainStreamHandlers;
+  } = {},
 ): Promise<ExplainResponse> {
   const trimmed = question.trim();
   if (trimmed.length < 3) {
@@ -40,6 +57,37 @@ export async function explainRepository(
   const limits = detailed ? DETAILED_LIMITS : QUICK_LIMITS;
 
   const history = opts.history ?? [];
+  const intent = classifyQuestion(trimmed);
+
+  // Greetings and "what can you do" are not code questions. Sending them through
+  // keyword retrieval used to match files that merely contained the letters of
+  // the greeting and explain one of them at random.
+  if (intent === 'smalltalk') {
+    const facts = await loadRepositoryFacts(repositoryId);
+    const req = {
+      messages: buildChatMessages(facts, trimmed, history),
+      temperature: 0.6,
+      maxTokens: 400,
+    };
+    const result = opts.stream
+      ? await provider.stream(req, { onDelta: opts.stream.onDelta })
+      : await provider.complete(req);
+    const reply = result.text.trim();
+    if (reply.length === 0) {
+      throw new AppError(
+        502,
+        'AI_EMPTY_RESPONSE',
+        'The model did not produce a reply. Try again.',
+      );
+    }
+    return {
+      answer: reply,
+      provider: provider.name,
+      model: result.model,
+      contextPaths: [],
+      openedPaths: [],
+    };
+  }
 
   // Retrieval query, not the prompt. A follow-up like "why?" or "show me that"
   // has no keywords of its own, so the recent *questions* in the thread are
@@ -60,21 +108,139 @@ export async function explainRepository(
     );
   }
 
-  const messages = buildMessages(context, trimmed, {
+  const messages: ChatMessage[] = buildMessages(context, trimmed, {
     detailed,
     history,
     summary: opts.summary ?? null,
+    overview: intent === 'overview',
   });
-  const result = await provider.complete({
+
+  // Files the model has already been shown — both the ones retrieval chose and
+  // any it opens itself, so it is never handed the same source twice.
+  const seen = new Set(context.files.map((f) => f.path));
+  // Tracked apart from `seen` so the UI can show what the model went and fetched.
+  const opened: string[] = [];
+  // Headroom for on-demand reads, on top of what retrieval already spent.
+  let readBudget = detailed ? 160_000 : 30_000;
+
+  const run = (req: Parameters<typeof provider.complete>[0]) =>
+    opts.stream ? provider.stream(req, { onDelta: opts.stream.onDelta }) : provider.complete(req);
+
+  let result = await run({
     messages,
     temperature: 0.4,
     maxTokens: detailed ? 9000 : 1400,
+    tools: [READ_FILES_TOOL],
   });
 
+  // Let the model pull in what it decides it needs. Bounded so a confused model
+  // cannot loop forever, and so cost per question stays predictable.
+  for (let round = 0; round < MAX_TOOL_ROUNDS && result.toolCalls?.length; round += 1) {
+    messages.push({
+      role: 'assistant',
+      content: result.text ?? '',
+      toolCalls: result.toolCalls,
+    });
+
+    const roundPaths: string[] = [];
+    for (const call of result.toolCalls) {
+      const read =
+        call.name === READ_FILES_TOOL.name
+          ? await runReadFiles(repositoryId, call.args, seen, readBudget)
+          : { text: `Unknown tool: ${call.name}`, paths: [] };
+      opened.push(...read.paths);
+      roundPaths.push(...read.paths);
+      readBudget -= read.text.length;
+      messages.push({ role: 'tool', content: read.text, toolCallId: call.id });
+    }
+
+    logger.info(
+      `Explain: tool round ${round + 1}, ${seen.size} file(s) in context, ` +
+        `${Math.max(readBudget, 0)} chars of read budget left`,
+    );
+
+    if (roundPaths.length > 0) opts.stream?.onFiles(roundPaths);
+    // Anything streamed before the tool call is not part of the final answer.
+    opts.stream?.onReset();
+
+    result = await run({
+      messages,
+      temperature: 0.4,
+      maxTokens: detailed ? 9000 : 1400,
+      // Stop offering the tool on the final round so the model must answer.
+      ...(round < MAX_TOOL_ROUNDS - 1 && readBudget > 0 ? { tools: [READ_FILES_TOOL] } : {}),
+    });
+  }
+
+  const answer = result.text.trim();
+  // A model that spends its last round on tool calls, or returns nothing, would
+  // otherwise be persisted as a blank message the reader cannot act on.
+  if (answer.length === 0) {
+    throw new AppError(
+      502,
+      'AI_EMPTY_RESPONSE',
+      'The model did not produce an answer. Try rephrasing the question.',
+    );
+  }
+
   return {
-    answer: result.text.trim(),
+    answer,
     provider: provider.name,
     model: result.model,
-    contextPaths: context.files.map((f) => f.path),
+    contextPaths: [...seen],
+    openedPaths: opened,
+  };
+}
+
+/** Callbacks a caller supplies to receive the answer incrementally. */
+export interface ExplainStreamHandlers {
+  onDelta: (text: string) => void;
+  /** Fired when the model opens files mid-answer, so the UI can say so. */
+  onFiles: (paths: string[]) => void;
+  /**
+   * Discard everything streamed so far. A round that ends in a tool call may
+   * have emitted preamble ("let me check that file…") which is not part of the
+   * saved answer — only the final round's text is. Without this the reader
+   * shows text that disappears when the persisted message replaces it.
+   */
+  onReset: () => void;
+}
+
+/**
+ * How many times the model may stop to read more files before it has to answer.
+ * Each round is another model call, so this bounds both latency and cost.
+ */
+const MAX_TOOL_ROUNDS = 3;
+
+
+/** The small set of project facts a conversational reply is grounded in. */
+async function loadRepositoryFacts(repositoryId: string): Promise<RepositoryFacts> {
+  const [repo, components] = await Promise.all([
+    repositoryRepository.findById(repositoryId),
+    componentRepository.listByRepository(repositoryId),
+  ]);
+  if (!repo) throw AppError.notFound('Repository not found', 'REPOSITORY_NOT_FOUND');
+
+  const topComponents = [...components]
+    .sort((a, b) => b.importedByCount - a.importedByCount)
+    .slice(0, 5)
+    .map((c) => c.name);
+
+  const areas = [
+    ...new Set(
+      components
+        .map((c) => c.file.path.split('/').slice(0, 2).join('/'))
+        .filter((a) => a.includes('/')),
+    ),
+  ].slice(0, 6);
+
+  return {
+    name: repo.name,
+    fileCount: repo.fileCount,
+    componentCount: repo.componentCount,
+    hookCount: repo.hookCount,
+    routeCount: repo.routeCount,
+    topComponents,
+    areas,
   };
 }

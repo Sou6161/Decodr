@@ -102,6 +102,66 @@ function fence(filePath: string): string {
 const DETAILED_NOTE =
   'MODE: DETAILED. Go all-out. Use everything in the attached files, trace every meaningful flow including secondary ones (loading/error/empty states, edge cases, types, helpers), and show plenty of real code snippets with explanation. Do not skip anything important — a longer, exhaustive answer is exactly what is wanted here.';
 
+/**
+ * Persona for messages that are not questions about specific code. The
+ * code-explanation prompt insists on file walkthroughs and snippets, which is
+ * exactly wrong when someone just says hello.
+ */
+export const CHAT_SYSTEM_PROMPT = `You are Decodr, an assistant that helps a developer understand a React/TypeScript codebase they have uploaded.
+
+You are talking to them in a chat. Reply like a helpful colleague would: warm, brief, and concrete. Two or three sentences is usually plenty.
+
+When they greet you or ask what you can do, say hello back and tell them — using the project facts you are given — what is actually in this project and give two or three specific example questions they could ask about THIS codebase, using real names from it. Never invent names that are not in the facts provided.
+
+No code blocks, no headings, no bullet-point walls, and never pretend to have read files you were not given. Do not restate the question back to them.`;
+
+/** Builds a short, repo-aware reply for greetings and "what can you do". */
+export function buildChatMessages(
+  facts: RepositoryFacts,
+  question: string,
+  history: HistoryTurn[] = [],
+): ChatMessage[] {
+  const lines = [
+    `Project: ${facts.name}`,
+    `Contents: ${facts.fileCount} files, ${facts.componentCount} components, ` +
+      `${facts.hookCount} hooks, ${facts.routeCount} routes.`,
+  ];
+  if (facts.topComponents.length > 0) {
+    lines.push(`Most-used components: ${facts.topComponents.join(', ')}.`);
+  }
+  if (facts.areas.length > 0) lines.push(`Main folders: ${facts.areas.join(', ')}.`);
+
+  return [
+    { role: 'system', content: CHAT_SYSTEM_PROMPT },
+    ...trimHistory(history),
+    { role: 'user', content: `Project facts:\n${lines.join('\n')}\n\nMessage: ${question}` },
+  ];
+}
+
+/** The handful of project facts a conversational reply needs. */
+export interface RepositoryFacts {
+  name: string;
+  fileCount: number;
+  componentCount: number;
+  hookCount: number;
+  routeCount: number;
+  topComponents: string[];
+  areas: string[];
+}
+
+/**
+ * Tells the model how to treat the map. Without this it tends either to ignore
+ * the map or to describe files it has only seen a one-line summary of as though
+ * it had read them.
+ */
+const MAP_NOTE =
+  'The map above lists every file in the project so you know what exists. You have NOT read those files yet — only the ones attached below, in full. ' +
+  'If answering properly needs a file you were not given, call the read_files tool with its exact path from the map and read it before answering; prefer one call listing several paths. ' +
+  'Never describe or quote the contents of a file you have not actually read — open it instead.';
+
+const OVERVIEW_NOTE =
+  'MODE: OVERVIEW. They want the big picture of the whole project, not a deep dive into one file. Start with what this app appears to be and what it does, then describe how it is organised — the main areas, how they fit together, and where someone should start reading. Keep code snippets to a minimum here; one or two short ones at most, only where they make a structural point. End by suggesting two specific things they could ask about next.';
+
 const FOLLOWUP_NOTE =
   'This is a follow-up in an ongoing conversation — the earlier turns are above. Resolve pronouns and shorthand ("it", "that function", "why?") against what was already discussed, and do not re-explain ground you already covered; build on it. The files attached below are freshly selected for THIS question, so they may differ from the earlier ones.';
 
@@ -159,7 +219,12 @@ function trimHistory(history: HistoryTurn[]): ChatMessage[] {
 export function buildMessages(
   context: ExplanationContext,
   question: string,
-  opts: { detailed?: boolean; history?: HistoryTurn[]; summary?: string | null } = {},
+  opts: {
+    detailed?: boolean;
+    history?: HistoryTurn[];
+    summary?: string | null;
+    overview?: boolean;
+  } = {},
 ): ChatMessage[] {
   const header: string[] = [];
   if (context.focusName) header.push(`This question is about: ${context.focusName}.`);
@@ -175,7 +240,9 @@ export function buildMessages(
     .join('\n\n');
 
   const userContent = [
-    opts.detailed ? DETAILED_NOTE : QUICK_NOTE,
+    opts.overview ? OVERVIEW_NOTE : opts.detailed ? DETAILED_NOTE : QUICK_NOTE,
+    context.repoMap,
+    MAP_NOTE,
     (opts.history?.length ?? 0) > 0 ? FOLLOWUP_NOTE : '',
     header.join('\n'),
     'Relevant files from the repository:',

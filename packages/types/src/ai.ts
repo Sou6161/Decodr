@@ -27,6 +27,12 @@ export interface ExplanationContext {
   files: ContextFile[];
   /** Names of components related to the focus (neighbors in the graph). */
   relatedComponents: string[];
+  /**
+   * A one-line-per-file index of the *whole* project — path, size, what it
+   * declares, and what it imports. Costs a fraction of the source it describes,
+   * so the model knows every file exists even though it only reads a few.
+   */
+  repoMap: string;
 }
 
 /** Request to explain part of a repository. */
@@ -42,4 +48,6 @@ export interface ExplainResponse {
   model: string;
   /** Repo-relative paths that were sent as context (for "sources" UI). */
   contextPaths: string[];
+  /** Files the model opened itself via the read_files tool. */
+  openedPaths: string[];
 }
