@@ -5,7 +5,7 @@ import { EmptyState, ErrorState, Skeleton } from '@/components/ui';
 import { GraphIcon } from '@/components/icons';
 import { useRepositoryGraph } from '@/features/graph/hooks';
 import { GraphView } from '@/features/graph/GraphView';
-import { FeatureMap } from '@/features/graph/FeatureMap';
+import { CodeMap } from '@/features/graph/CodeMap';
 import { cn } from '@/utils/cn';
 
 type View = 'overview' | 'graph';
@@ -58,7 +58,7 @@ export function GraphPage() {
         </div>
       </div>
 
-      {view === 'overview' ? <FeatureMap graph={graph} repoId={repo.id} /> : <GraphView graph={graph} />}
+      {view === 'overview' ? <CodeMap graph={graph} repoId={repo.id} /> : <GraphView graph={graph} />}
     </div>
   );
 }
