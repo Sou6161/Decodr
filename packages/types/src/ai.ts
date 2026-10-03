@@ -33,6 +33,11 @@ export interface ExplanationContext {
    * so the model knows every file exists even though it only reads a few.
    */
   repoMap: string;
+  /**
+   * True when nothing in the question identified a part of the code and the
+   * files are a guess at the project's centre rather than a match.
+   */
+  guessed: boolean;
 }
 
 /** Request to explain part of a repository. */

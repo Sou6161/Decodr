@@ -170,6 +170,7 @@ export async function buildExplanationContext(
   const focus = scoredComponents[0]?.c ?? null;
 
   let focusName: string | null = null;
+  let guessed = false;
   let relatedComponents: string[] = [];
   let orderedPaths: string[] = [];
 
@@ -221,6 +222,11 @@ export async function buildExplanationContext(
     relatedComponents = [...targetNames];
     orderedPaths = unique([...routeFiles, ...targetFiles]);
   } else {
+    // Nothing in the question identified a part of the code, so these files are
+    // a guess at the project's centre — not an answer to what was asked. The
+    // prompt is told as much, because silently explaining the most-imported
+    // component is how "explain this file" came back about something unrelated.
+    guessed = true;
     // General architecture question — lead with the most-imported hub components.
     const hubs = [...components]
       .sort((a, b) => b.importedByCount - a.importedByCount)
@@ -268,7 +274,7 @@ export async function buildExplanationContext(
     imports: fileImports,
   });
 
-  return { focusName, files, relatedComponents, repoMap };
+  return { focusName, files, relatedComponents, repoMap, guessed };
 }
 
 /**

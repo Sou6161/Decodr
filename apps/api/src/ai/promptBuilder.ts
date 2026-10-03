@@ -172,6 +172,10 @@ export interface RepositoryFacts {
  * the map or to describe files it has only seen a one-line summary of as though
  * it had read them.
  */
+/** Shown when retrieval could not tell what the question was about. */
+const GUESSED_NOTE =
+  'IMPORTANT: nothing in this question named a component, file or feature, so the files attached below were NOT matched to it — they are just the project\'s most-imported components. Do not explain them as though they were the answer. If the question is ambiguous ("explain this file", "how does it work"), say what is unclear and ask which part they mean, offering two or three specific options by name from the project map. Only give a real explanation if the question genuinely is about the project as a whole.';
+
 const MAP_NOTE =
   'The map above lists every file in the project so you know what exists. You have NOT read those files yet — only the ones attached below, in full. ' +
   'You have tools — use them rather than guessing or hedging. read_files opens files by their exact path from the map (prefer one call listing several). ' +
@@ -261,6 +265,7 @@ export function buildMessages(
 
   const userContent = [
     opts.overview ? OVERVIEW_NOTE : opts.detailed ? DETAILED_NOTE : QUICK_NOTE,
+    context.guessed ? GUESSED_NOTE : '',
     context.repoMap,
     MAP_NOTE,
     (opts.history?.length ?? 0) > 0 ? FOLLOWUP_NOTE : '',
