@@ -2,11 +2,13 @@ import { useEffect, useMemo, useRef, useState, type FormEvent } from 'react';
 import { useOutletContext, useSearchParams } from 'react-router-dom';
 import { AnimatePresence, motion } from 'framer-motion';
 import type { Repository } from '@decodr/types';
-import { Button, Card, Spinner } from '@/components/ui';
+import { MessageRole } from '@decodr/types';
+import { Button, Card, Skeleton, Spinner } from '@/components/ui';
 import { SparkIcon } from '@/components/icons';
 import { useRepositoryGraph } from '@/features/graph/hooks';
 import { useAsk, useConversation } from '@/features/explain/hooks';
 import { ChatMessages } from '@/features/explain/ChatMessages';
+import { exportConversation } from '@/features/explain/exportChat';
 import { Markdown } from '@/features/explain/Markdown';
 import { cn } from '@/utils/cn';
 
@@ -28,6 +30,21 @@ export function ExplainPage() {
   const pendingQuestion = useRef('');
   const scrollAnchor = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
+  // Auto-scrolling on every token fights the reader when they scroll back to
+  // re-read something, so it only follows while they are already at the bottom.
+  const [atBottom, setAtBottom] = useState(true);
+
+  // Arriving from the Feature Map with ?q=… pre-fills the composer rather than
+  // asking straight away, so the wording can still be adjusted first.
+  const seeded = params.get('q');
+  useEffect(() => {
+    if (!seeded) return;
+    setInput(seeded);
+    inputRef.current?.focus();
+    const next = new URLSearchParams(params);
+    next.delete('q');
+    setParams(next, { replace: true });
+  }, [seeded, params, setParams]);
 
   const setModePersisted = (m: Mode) => {
     setMode(m);
@@ -40,12 +57,43 @@ export function ExplainPage() {
 
   const messages = active.data?.messages ?? [];
   const showEmpty = !activeId || active.isError;
+  // Reloading a saved chat renders nothing until the fetch lands. That blank
+  // screen reads as "my conversation is gone", so show its shape while loading.
+  const restoring = Boolean(activeId) && active.isLoading;
 
   const suggestions = useMemo(() => buildSuggestions(graph?.nodes ?? []), [graph]);
 
+  const followUps = useMemo(
+    () => buildFollowUps(messages, graph?.nodes ?? []),
+    [messages, graph],
+  );
+
   useEffect(() => {
-    scrollAnchor.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [messages.length, ask.isPending]);
+    if (atBottom) scrollAnchor.current?.scrollIntoView({ behavior: 'smooth' });
+  }, [messages.length, ask.isPending, ask.streamed, atBottom]);
+
+  useEffect(() => {
+    const onScroll = () => {
+      const gap =
+        document.documentElement.scrollHeight -
+        window.scrollY -
+        window.innerHeight;
+      setAtBottom(gap < 120);
+    };
+    onScroll();
+    window.addEventListener('scroll', onScroll, { passive: true });
+    return () => window.removeEventListener('scroll', onScroll);
+  }, []);
+
+  // Esc stops a running answer, matching what people expect from a chat.
+  useEffect(() => {
+    if (!ask.isPending) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') ask.stop();
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [ask]);
 
   const submit = (question: string) => {
     const q = question.trim();
@@ -58,7 +106,11 @@ export function ExplainPage() {
         detailed: mode === 'detailed',
         ...(activeId ? { conversationId: activeId } : {}),
       },
-      { onSuccess: ({ conversation }) => setActive(conversation.id) },
+      {
+        onSuccess: ({ conversation }) => setActive(conversation.id),
+        // Losing the question on failure means retyping it. Put it back.
+        onError: () => setInput(q),
+      },
     );
   };
 
@@ -69,6 +121,17 @@ export function ExplainPage() {
 
   return (
     <div className="mx-auto max-w-4xl">
+      {active.data && messages.length > 0 && (
+        <div className="mb-3 flex justify-end">
+          <button
+            type="button"
+            onClick={() => exportConversation(active.data!, repo.name)}
+            className="rounded-lg border border-border px-2.5 py-1 text-[11px] font-medium text-muted transition-colors hover:border-border-strong hover:text-foreground"
+          >
+            Export as Markdown
+          </button>
+        </div>
+      )}
       <div className="space-y-4">
         {showEmpty && !ask.isPending && (
           <div className="rounded-2xl border border-border bg-surface/50 p-6">
@@ -95,13 +158,26 @@ export function ExplainPage() {
           </div>
         )}
 
-        {!showEmpty && (
+        {restoring && (
+          <div className="space-y-6" aria-label="Loading conversation">
+            <div className="flex justify-end">
+              <Skeleton className="h-10 w-2/5 rounded-2xl" />
+            </div>
+            <Skeleton className="h-40 rounded-2xl" />
+            <div className="flex justify-end">
+              <Skeleton className="h-10 w-1/3 rounded-2xl" />
+            </div>
+          </div>
+        )}
+
+        {!showEmpty && !restoring && (
           <ChatMessages
             messages={messages}
             onEdit={(content) => {
               setInput(content);
               inputRef.current?.focus();
             }}
+            onRegenerate={(question) => submit(question)}
           />
         )}
 
@@ -150,8 +226,36 @@ export function ExplainPage() {
           )}
         </AnimatePresence>
 
+        {/* Next questions drawn from the graph around what was just read, so
+            they point somewhere real rather than being generic prompts. */}
+        {!ask.isPending && messages.length > 0 && followUps.length > 0 && (
+          <div className="flex flex-wrap gap-2 pt-1">
+            {followUps.map((f) => (
+              <button
+                key={f}
+                type="button"
+                onClick={() => submit(f)}
+                className="rounded-full border border-border bg-surface-raised px-3 py-1.5 text-xs text-muted transition-colors hover:border-border-strong hover:text-foreground"
+              >
+                {f}
+              </button>
+            ))}
+          </div>
+        )}
+
         <div ref={scrollAnchor} />
       </div>
+
+      {/* Only shown once they have scrolled away from the live output. */}
+      {!atBottom && (messages.length > 0 || ask.isPending) && (
+        <button
+          type="button"
+          onClick={() => scrollAnchor.current?.scrollIntoView({ behavior: 'smooth' })}
+          className="sticky bottom-24 z-10 ml-auto flex items-center gap-1.5 rounded-full border border-border bg-surface px-3 py-1.5 text-xs font-medium text-muted shadow-lg shadow-black/30 transition-colors hover:border-border-strong hover:text-foreground"
+        >
+          ↓ Jump to latest
+        </button>
+      )}
 
       <form onSubmit={onSubmit} className="sticky bottom-4 mt-4">
         <div className="rounded-2xl border border-border glass p-2 shadow-lg shadow-black/20">
@@ -239,6 +343,31 @@ function waitingLabel(intent: Mode | string | null, mode: Mode): string {
   }
   // Intent not known yet — say nothing that might turn out to be false.
   return 'Thinking…';
+}
+
+/**
+ * Up to three next questions, chosen from components the last answer actually
+ * mentioned. Generic prompts get ignored; ones naming something the reader just
+ * read about do not.
+ */
+function buildFollowUps(
+  messages: { role: string; content: string }[],
+  nodes: { data: { name: string; importedByCount: number } }[],
+): string[] {
+  const last = [...messages].reverse().find((m) => m.role === MessageRole.Assistant);
+  if (!last || nodes.length === 0) return [];
+
+  const mentioned = nodes
+    .filter((n) => n.data.name.length > 2 && last.content.includes(n.data.name))
+    .sort((a, b) => b.data.importedByCount - a.data.importedByCount)
+    .slice(0, 2)
+    .map((n) => n.data.name);
+
+  const out = mentioned.flatMap((name) => [
+    `Where is ${name} used?`,
+    `Walk me through ${name} in detail`,
+  ]);
+  return [...new Set(out)].slice(0, 3);
 }
 
 /** Example questions, seeded with the graph's most-central component. */

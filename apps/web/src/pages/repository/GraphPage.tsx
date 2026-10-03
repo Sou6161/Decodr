@@ -58,7 +58,7 @@ export function GraphPage() {
         </div>
       </div>
 
-      {view === 'overview' ? <FeatureMap graph={graph} /> : <GraphView graph={graph} />}
+      {view === 'overview' ? <FeatureMap graph={graph} repoId={repo.id} /> : <GraphView graph={graph} />}
     </div>
   );
 }

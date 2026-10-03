@@ -14,6 +14,8 @@ export const explainApi = {
     repoId: string,
     body: { conversationId?: string; question: string; detailed?: boolean },
   ) => apiClient.post<AskResponse>(`/repositories/${repoId}/conversations/ask`, body),
+  renameConversation: (repoId: string, cid: string, title: string) =>
+    apiClient.patch<void>(`/repositories/${repoId}/conversations/${cid}`, { title }),
   deleteConversation: (repoId: string, cid: string) =>
     apiClient.delete<void>(`/repositories/${repoId}/conversations/${cid}`),
 };

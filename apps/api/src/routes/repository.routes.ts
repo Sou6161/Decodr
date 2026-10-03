@@ -34,4 +34,5 @@ repositoryRouter.post(
   asyncHandler(conversationController.askStream),
 );
 repositoryRouter.get('/:id/conversations/:cid', owned, asyncHandler(conversationController.detail));
+repositoryRouter.patch('/:id/conversations/:cid', owned, asyncHandler(conversationController.rename));
 repositoryRouter.delete('/:id/conversations/:cid', owned, asyncHandler(conversationController.remove));

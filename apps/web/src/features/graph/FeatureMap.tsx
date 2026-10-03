@@ -1,5 +1,6 @@
 import { useMemo, useState } from 'react';
 import { motion } from 'framer-motion';
+import { useNavigate } from 'react-router-dom';
 import type { RepositoryGraph } from '@decodr/types';
 import { cn } from '@/utils/cn';
 import { colorForKey, featureLabel, featureOf, tint } from './colors';
@@ -27,8 +28,16 @@ const PREVIEW = 6;
  * components with a size bar. No relationships to decode — an at-a-glance read
  * on what the project is made of and where the weight sits.
  */
-export function FeatureMap({ graph }: { graph: RepositoryGraph }) {
+export function FeatureMap({ graph, repoId }: { graph: RepositoryGraph; repoId: string }) {
+  const navigate = useNavigate();
   const areas = useMemo(() => buildAreas(graph), [graph]);
+
+  // The map shows what exists; Explain says how it works. Clicking a component
+  // moves between the two instead of leaving the reader to retype its name.
+  const explain = (name: string) =>
+    navigate(
+      `/repositories/${repoId}/explain?q=${encodeURIComponent(`Explain the ${name} component`)}`,
+    );
   const totalLines = areas.reduce((s, a) => s + a.totalLines, 0);
 
   return (
@@ -46,7 +55,7 @@ export function FeatureMap({ graph }: { graph: RepositoryGraph }) {
       >
         {areas.map((area) => (
           <motion.div key={area.key} variants={fadeUpItem}>
-            <AreaCard area={area} />
+            <AreaCard area={area} onExplain={explain} />
           </motion.div>
         ))}
       </motion.div>
@@ -54,7 +63,7 @@ export function FeatureMap({ graph }: { graph: RepositoryGraph }) {
   );
 }
 
-function AreaCard({ area }: { area: Area }) {
+function AreaCard({ area, onExplain }: { area: Area; onExplain: (name: string) => void }) {
   const [expanded, setExpanded] = useState(false);
   const maxLines = area.components[0]?.lineCount || 1;
   const shown = expanded ? area.components : area.components.slice(0, PREVIEW);
@@ -83,7 +92,13 @@ function AreaCard({ area }: { area: Area }) {
 
       <div className="flex-1 space-y-1.5 px-4 pb-4">
         {shown.map((c) => (
-          <div key={c.filePath + c.name} className="group" title={`${c.filePath} · ${c.lineCount} lines`}>
+          <button
+            type="button"
+            key={c.filePath + c.name}
+            onClick={() => onExplain(c.name)}
+            title={`${c.filePath} · ${c.lineCount} lines — click to explain`}
+            className="group w-full rounded text-left transition-colors hover:bg-surface-raised/60"
+          >
             <div className="flex items-center justify-between gap-2">
               <div className="flex min-w-0 items-center gap-2">
                 <span className="h-1.5 w-1.5 shrink-0 rounded-full" style={{ backgroundColor: area.color }} />
@@ -109,7 +124,7 @@ function AreaCard({ area }: { area: Area }) {
                 }}
               />
             </div>
-          </div>
+          </button>
         ))}
 
         {hidden > 0 && (

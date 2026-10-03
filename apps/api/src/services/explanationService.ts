@@ -13,6 +13,14 @@ import {
 } from '../ai/promptBuilder.js';
 import { classifyQuestion, type QuestionIntent } from '../ai/intent.js';
 import { READ_FILES_TOOL, runReadFiles } from '../ai/fileReader.js';
+import {
+  FIND_USAGES_TOOL,
+  GET_COMPONENT_TOOL,
+  SEARCH_CODE_TOOL,
+  runFindUsages,
+  runGetComponent,
+  runSearchCode,
+} from '../ai/codeTools.js';
 import type { ChatMessage } from '../ai/types.js';
 import { logger } from '../utils/logger.js';
 import { repositoryRepository } from '../repositories/repositoryRepository.js';
@@ -140,7 +148,7 @@ export async function explainRepository(
     messages,
     temperature: 0.4,
     maxTokens: detailed ? 9000 : 1400,
-    tools: [READ_FILES_TOOL],
+    tools: TOOLS,
   });
 
   // Let the model pull in what it decides it needs. Bounded so a confused model
@@ -154,10 +162,7 @@ export async function explainRepository(
 
     const roundPaths: string[] = [];
     for (const call of result.toolCalls) {
-      const read =
-        call.name === READ_FILES_TOOL.name
-          ? await runReadFiles(repositoryId, call.args, seen, readBudget)
-          : { text: `Unknown tool: ${call.name}`, paths: [] };
+      const read = await runTool(repositoryId, call.name, call.args, seen, readBudget);
       opened.push(...read.paths);
       roundPaths.push(...read.paths);
       readBudget -= read.text.length;
@@ -191,7 +196,7 @@ export async function explainRepository(
       messages,
       temperature: 0.4,
       maxTokens: detailed ? 9000 : 1400,
-      ...(canReadMore ? { tools: [READ_FILES_TOOL] } : {}),
+      ...(canReadMore ? { tools: TOOLS } : {}),
     });
   }
 
@@ -252,6 +257,37 @@ export interface ExplainStreamHandlers {
    * shows text that disappears when the persisted message replaces it.
    */
   onReset: () => void;
+}
+
+/** Everything the model may call while answering. */
+const TOOLS = [READ_FILES_TOOL, SEARCH_CODE_TOOL, FIND_USAGES_TOOL, GET_COMPONENT_TOOL];
+
+/**
+ * Dispatches one tool call.
+ *
+ * Only `read_files` returns paths worth citing — the others answer questions
+ * about the project rather than handing over source, so they do not count
+ * towards the files shown to the reader.
+ */
+async function runTool(
+  repositoryId: string,
+  name: string,
+  args: string,
+  seen: Set<string>,
+  budget: number,
+): Promise<{ text: string; paths: string[] }> {
+  switch (name) {
+    case READ_FILES_TOOL.name:
+      return runReadFiles(repositoryId, args, seen, budget);
+    case SEARCH_CODE_TOOL.name:
+      return { text: await runSearchCode(repositoryId, args), paths: [] };
+    case FIND_USAGES_TOOL.name:
+      return { text: await runFindUsages(repositoryId, args), paths: [] };
+    case GET_COMPONENT_TOOL.name:
+      return { text: await runGetComponent(repositoryId, args), paths: [] };
+    default:
+      return { text: `Unknown tool: ${name}`, paths: [] };
+  }
 }
 
 /**

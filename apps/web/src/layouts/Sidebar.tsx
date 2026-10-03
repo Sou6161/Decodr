@@ -13,6 +13,7 @@ import { Button, ConfirmDialog } from '@/components/ui';
 import {
   useConversations,
   useDeleteConversation,
+  useRenameConversation,
 } from '@/features/explain/hooks';
 import { relativeTime } from '@/utils/time';
 import type { ComponentType, MouseEvent, SVGProps } from 'react';
@@ -88,7 +89,23 @@ function RepoSection({ repoId, onNavigate }: { repoId: string; onNavigate?: () =
   const activeConversation = params.get('c');
   const { data: conversations = [], isLoading } = useConversations(repoId);
   const del = useDeleteConversation(repoId);
+  const rename = useRenameConversation(repoId);
   const [confirmId, setConfirmId] = useState<string | null>(null);
+  const [renamingId, setRenamingId] = useState<string | null>(null);
+  const [draftTitle, setDraftTitle] = useState('');
+  const [query, setQuery] = useState('');
+
+  // Titles come from the first question, so a thread's real subject is often
+  // only findable by searching them.
+  const visible = query.trim()
+    ? conversations.filter((c) => c.title.toLowerCase().includes(query.trim().toLowerCase()))
+    : conversations;
+
+  const commitRename = (id: string) => {
+    const title = draftTitle.trim();
+    if (title) rename.mutate({ cid: id, title });
+    setRenamingId(null);
+  };
 
   const REPO_NAV: NavItem[] = [
     { to: `/repositories/${repoId}`, label: 'Dashboard', icon: DashboardIcon, end: true },
@@ -124,12 +141,39 @@ function RepoSection({ repoId, onNavigate }: { repoId: string; onNavigate?: () =
           New chat
         </Button>
 
+        {conversations.length > 4 && (
+          <input
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            placeholder="Search chats…"
+            aria-label="Search chats"
+            className="mt-2 w-full rounded-lg border border-border bg-surface-raised px-2.5 py-1.5 text-xs text-foreground outline-none placeholder:text-subtle focus:border-border-strong"
+          />
+        )}
+
         <div className="mt-2 flex-1 space-y-0.5 overflow-y-auto">
           {isLoading && <p className="px-3 py-2 text-xs text-subtle">Loading chats…</p>}
           {!isLoading && conversations.length === 0 && (
             <p className="px-3 py-2 text-[11px] text-subtle">No chats yet.</p>
           )}
-          {conversations.map((c) => (
+          {!isLoading && conversations.length > 0 && visible.length === 0 && (
+            <p className="px-3 py-2 text-[11px] text-subtle">No chats match “{query}”.</p>
+          )}
+          {visible.map((c) =>
+            c.id === renamingId ? (
+              <input
+                key={c.id}
+                autoFocus
+                value={draftTitle}
+                onChange={(e) => setDraftTitle(e.target.value)}
+                onBlur={() => commitRename(c.id)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') commitRename(c.id);
+                  if (e.key === 'Escape') setRenamingId(null);
+                }}
+                className="w-full rounded-lg border border-primary/50 bg-surface-raised px-3 py-1.5 text-xs text-foreground outline-none"
+              />
+            ) : (
             <button
               key={c.id}
               type="button"
@@ -147,6 +191,19 @@ function RepoSection({ repoId, onNavigate }: { repoId: string; onNavigate?: () =
               </div>
               <span
                 role="button"
+                aria-label="Rename chat"
+                title="Rename"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setDraftTitle(c.title);
+                  setRenamingId(c.id);
+                }}
+                className="shrink-0 rounded px-1 text-[10px] text-subtle opacity-0 transition-all hover:text-foreground group-hover:opacity-100"
+              >
+                Rename
+              </span>
+              <span
+                role="button"
                 aria-label="Delete chat"
                 onClick={(e) => requestDelete(e, c.id)}
                 className="shrink-0 rounded p-1 text-subtle opacity-0 transition-all hover:bg-danger/15 hover:text-danger group-hover:opacity-100"
@@ -154,7 +211,8 @@ function RepoSection({ repoId, onNavigate }: { repoId: string; onNavigate?: () =
                 <TrashIcon width={13} height={13} />
               </span>
             </button>
-          ))}
+            ),
+          )}
         </div>
       </div>
 

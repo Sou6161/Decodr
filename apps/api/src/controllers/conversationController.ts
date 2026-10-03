@@ -22,6 +22,10 @@ const AskBodySchema = z.object({
   detailed: z.boolean().optional(),
 });
 
+const RenameBodySchema = z.object({
+  title: z.string().trim().min(1, 'Title cannot be empty').max(120, 'Title is too long'),
+});
+
 function requireParam(req: Request, name: string): string {
   const value = req.params[name];
   if (!value) throw AppError.badRequest(`Missing ${name}`);
@@ -118,6 +122,16 @@ export const conversationController = {
     } finally {
       res.end();
     }
+  },
+
+  async rename(req: Request, res: Response): Promise<void> {
+    const { title } = RenameBodySchema.parse(req.body);
+    await conversationService.rename(
+      requireParam(req, 'id'),
+      requireParam(req, 'cid'),
+      title,
+    );
+    res.status(204).end();
   },
 
   async ask(req: Request, res: Response): Promise<void> {

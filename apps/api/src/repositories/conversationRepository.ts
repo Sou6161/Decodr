@@ -47,6 +47,11 @@ export const conversationRepository = {
     });
   },
 
+  /** Renames a conversation, scoped to its repository so ids cannot be probed. */
+  rename(id: string, repositoryId: string, title: string) {
+    return prisma.conversation.updateMany({ where: { id, repositoryId }, data: { title } });
+  },
+
   /** Persists the rolling summary and how many messages it now covers. */
   saveSummary(id: string, summary: string, summarizedCount: number): Promise<unknown> {
     return prisma.conversation.update({

@@ -10,10 +10,13 @@ const CONTEXT_PREVIEW = 5;
 export function ChatMessages({
   messages,
   onEdit,
+  onRegenerate,
 }: {
   messages: Message[];
   /** Puts a past question back in the composer so it can be reworded and re-asked. */
   onEdit?: (content: string) => void;
+  /** Re-asks the question that produced the last answer. */
+  onRegenerate?: (question: string) => void;
 }) {
   return (
     <div className="space-y-6">
@@ -21,20 +24,40 @@ export function ChatMessages({
         message.role === MessageRole.User ? (
           <UserBubble key={message.id} content={message.content} {...(onEdit ? { onEdit } : {})} />
         ) : (
-          <AssistantCard key={message.id} message={message} />
+          <AssistantCard
+            key={message.id}
+            message={message}
+            {...(onRegenerate && message.id === messages[messages.length - 1]?.id
+              ? { onRegenerate: () => onRegenerate(lastQuestionBefore(messages, message.id)) }
+              : {})}
+          />
         ),
       )}
     </div>
   );
 }
 
+/** The question that produced a given answer, for regenerating it. */
+function lastQuestionBefore(messages: Message[], answerId: string): string {
+  const idx = messages.findIndex((m) => m.id === answerId);
+  for (let i = idx - 1; i >= 0; i -= 1) {
+    if (messages[i]!.role === MessageRole.User) return messages[i]!.content;
+  }
+  return '';
+}
+
 /** Copy / edit actions that appear on hover, as in a normal chat client. */
 function MessageActions({
   content,
   onEdit,
+  onRegenerate,
+  label,
 }: {
   content: string;
   onEdit?: (content: string) => void;
+  onRegenerate?: () => void;
+  /** Distinguishes the answer's action row from a question's. */
+  label?: string;
 }) {
   const [copied, setCopied] = useState(false);
   const copy = async () => {
@@ -49,7 +72,12 @@ function MessageActions({
   const btn =
     'rounded px-1.5 py-0.5 text-[11px] font-medium text-subtle transition-colors hover:bg-surface-raised hover:text-foreground';
   return (
-    <div className="mt-1 flex justify-end gap-1 opacity-0 transition-opacity group-hover:opacity-100 focus-within:opacity-100">
+    <div
+      className={cn(
+        'flex gap-1 opacity-0 transition-opacity group-hover:opacity-100 focus-within:opacity-100',
+        label ? 'mt-3 justify-start border-t border-border pt-2' : 'mt-1 justify-end',
+      )}
+    >
       {onEdit && (
         <button type="button" className={btn} onClick={() => onEdit(content)}>
           Edit
@@ -58,6 +86,11 @@ function MessageActions({
       <button type="button" className={btn} onClick={() => void copy()}>
         {copied ? 'Copied' : 'Copy'}
       </button>
+      {onRegenerate && (
+        <button type="button" className={btn} onClick={onRegenerate}>
+          Regenerate
+        </button>
+      )}
     </div>
   );
 }
@@ -83,7 +116,13 @@ function UserBubble({
   );
 }
 
-function AssistantCard({ message }: { message: Message }) {
+function AssistantCard({
+  message,
+  onRegenerate,
+}: {
+  message: Message;
+  onRegenerate?: () => void;
+}) {
   const [expanded, setExpanded] = useState(false);
   // Files the model went and fetched mid-answer, highlighted so the difference
   // from up-front retrieval is visible.
@@ -93,8 +132,13 @@ function AssistantCard({ message }: { message: Message }) {
   const hidden = total - shown.length;
 
   return (
-    <Card className="p-5">
+    <Card className="group p-5">
       <Markdown content={message.content} />
+      <MessageActions
+        content={message.content}
+        label="answer"
+        {...(onRegenerate ? { onRegenerate } : {})}
+      />
       {total > 0 && (
         <div className="mt-4 border-t border-border pt-3">
           <p className="mb-2 text-[11px] uppercase tracking-wide text-subtle">

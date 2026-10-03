@@ -3,6 +3,7 @@ import type {
   Conversation,
   ConversationWithMessages,
 } from '@decodr/types';
+import { AIProviderName } from '@decodr/types';
 import { MessageRole } from '@decodr/types';
 import { conversationRepository } from '../repositories/conversationRepository.js';
 import { messageRepository } from '../repositories/messageRepository.js';
@@ -36,6 +37,13 @@ export const conversationService = {
     const row = await conversationRepository.findWithMessages(conversationId, repositoryId);
     if (!row) throw AppError.notFound('Conversation not found', 'CONVERSATION_NOT_FOUND');
     return toConversationWithMessagesDto(row);
+  },
+
+  /** Renames a conversation. Titles are derived from the first question, which
+   *  is often not what the thread turned out to be about. */
+  async rename(repositoryId: string, conversationId: string, title: string): Promise<void> {
+    const { count } = await conversationRepository.rename(conversationId, repositoryId, title);
+    if (count === 0) throw AppError.notFound('Conversation not found', 'CONVERSATION_NOT_FOUND');
   },
 
   async remove(repositoryId: string, conversationId: string): Promise<void> {
@@ -90,14 +98,45 @@ export const conversationService = {
       pendingSummary = { conversationId, history };
     }
 
+    // Mirror the streamed text so a stopped answer can still be saved — losing
+    // what someone already read is worse than keeping it marked as incomplete.
+    let partial = '';
+    const streamWithCapture = params.stream
+      ? {
+          ...params.stream,
+          onDelta: (t: string) => {
+            partial += t;
+            params.stream!.onDelta(t);
+          },
+          onReset: () => {
+            partial = '';
+            params.stream!.onReset();
+          },
+        }
+      : undefined;
+
     // Generate the answer before writing anything.
-    const result = await explainRepository(repositoryId, question, {
-      detailed: detailed ?? false,
-      history,
-      summary: summaryState.summary,
-      ...(params.stream ? { stream: params.stream } : {}),
-      ...(params.signal ? { signal: params.signal } : {}),
-    });
+    let result;
+    try {
+      result = await explainRepository(repositoryId, question, {
+        detailed: detailed ?? false,
+        history,
+        summary: summaryState.summary,
+        ...(streamWithCapture ? { stream: streamWithCapture } : {}),
+        ...(params.signal ? { signal: params.signal } : {}),
+      });
+    } catch (err) {
+      const stopped = params.signal?.aborted ?? false;
+      // A stop with nothing written yet has nothing worth keeping.
+      if (!stopped || partial.trim().length === 0) throw err;
+      result = {
+        answer: `${partial.trim()}\n\n_(stopped)_`,
+        provider: AIProviderName.OpenAI,
+        model: 'stopped',
+        contextPaths: [],
+        openedPaths: [],
+      };
+    }
 
     const conversation =
       conversationId ??

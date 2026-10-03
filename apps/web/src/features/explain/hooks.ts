@@ -117,6 +117,19 @@ export function useAsk(repoId: string) {
   });
 }
 
+/** Renames a conversation, updating the list in place. */
+export function useRenameConversation(repoId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ cid, title }: { cid: string; title: string }) =>
+      explainApi.renameConversation(repoId, cid, title),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: conversationKeys.all(repoId) });
+    },
+    onError: () => toast.error('Rename failed', 'Could not rename that chat.'),
+  });
+}
+
 /** Deletes a conversation and refreshes the list. */
 export function useDeleteConversation(repoId: string) {
   const queryClient = useQueryClient();
