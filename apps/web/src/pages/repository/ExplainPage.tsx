@@ -108,22 +108,23 @@ export function ExplainPage() {
     );
   };
 
-  // Arriving from the chart with ?q=… asks straight away.
-  //
-  // The question is also written into the composer first. If the send fails for
-  // any reason the text is still sitting there to retry, which is better than a
-  // click that silently does nothing — the failure mode this replaced.
+  /**
+   * Arriving from the chart with ?q=… fills the composer and waits.
+   *
+   * It used to send the question too, but `submit` clears the input as its first
+   * act — so the text was written and wiped in the same tick, and any hiccup in
+   * the send left an empty box with nothing to retry. Filling it and letting the
+   * reader press Ask has no race in it, and they can reword first.
+   */
   useEffect(() => {
     if (!seeded || seedHandled.current === seeded) return;
     seedHandled.current = seeded;
     setInput(seeded);
+    inputRef.current?.focus();
     const next = new URLSearchParams(params);
     next.delete('q');
     setParams(next, { replace: true });
-    submit(seeded);
-    // `submit` is recreated each render; the ref guard is what keeps this to one run.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [seeded]);
+  }, [seeded, params, setParams]);
 
   const onSubmit = (e: FormEvent) => {
     e.preventDefault();

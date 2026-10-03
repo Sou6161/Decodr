@@ -230,7 +230,7 @@ function Chart({
           );
         })}
       </ul>
-      <p className="mt-4 text-[11px] text-subtle">Click a bar to ask about that component.</p>
+      <p className="mt-4 text-[11px] text-subtle">Click a bar to put a question about it in the composer.</p>
     </figure>
   );
 }
