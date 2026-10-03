@@ -30,9 +30,6 @@ export function ExplainPage() {
   const pendingQuestion = useRef('');
   const scrollAnchor = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
-  // submit is defined below; the seed effect reaches it through a ref so the
-  // effect does not have to be re-created on every render.
-  const submitRef = useRef<((q: string) => void) | null>(null);
   // Auto-scrolling on every token fights the reader when they scroll back to
   // re-read something, so it only follows while they are already at the bottom.
   const [atBottom, setAtBottom] = useState(true);
@@ -42,15 +39,6 @@ export function ExplainPage() {
   // "ask about that component" did nothing until you noticed and pressed Ask.
   const seeded = params.get('q');
   const seedHandled = useRef<string | null>(null);
-
-  useEffect(() => {
-    if (!seeded || seedHandled.current === seeded) return;
-    seedHandled.current = seeded;
-    const next = new URLSearchParams(params);
-    next.delete('q');
-    setParams(next, { replace: true });
-    submitRef.current?.(seeded);
-  }, [seeded, params, setParams]);
 
   const setModePersisted = (m: Mode) => {
     setMode(m);
@@ -120,7 +108,22 @@ export function ExplainPage() {
     );
   };
 
-  submitRef.current = submit;
+  // Arriving from the chart with ?q=… asks straight away.
+  //
+  // The question is also written into the composer first. If the send fails for
+  // any reason the text is still sitting there to retry, which is better than a
+  // click that silently does nothing — the failure mode this replaced.
+  useEffect(() => {
+    if (!seeded || seedHandled.current === seeded) return;
+    seedHandled.current = seeded;
+    setInput(seeded);
+    const next = new URLSearchParams(params);
+    next.delete('q');
+    setParams(next, { replace: true });
+    submit(seeded);
+    // `submit` is recreated each render; the ref guard is what keeps this to one run.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [seeded]);
 
   const onSubmit = (e: FormEvent) => {
     e.preventDefault();
