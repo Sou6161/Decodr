@@ -95,7 +95,15 @@ function MessageActions({
   );
 }
 
-function UserBubble({
+/**
+ * A question as the reader wrote it.
+ *
+ * Exported because the pending state renders one too, and when the two were
+ * styled separately they drifted — the pending copy lost `whitespace-pre-wrap`,
+ * so a pasted multi-line question showed as one paragraph until the answer
+ * arrived and the saved message replaced it.
+ */
+export function UserBubble({
   content,
   onEdit,
 }: {

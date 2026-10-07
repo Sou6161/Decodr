@@ -7,7 +7,7 @@ import { Button, Card, Skeleton, Spinner } from '@/components/ui';
 import { SparkIcon } from '@/components/icons';
 import { useRepositoryGraph } from '@/features/graph/hooks';
 import { useAsk, useConversation } from '@/features/explain/hooks';
-import { ChatMessages } from '@/features/explain/ChatMessages';
+import { ChatMessages, UserBubble } from '@/features/explain/ChatMessages';
 import { exportConversation } from '@/features/explain/exportChat';
 import { Markdown } from '@/features/explain/Markdown';
 import { cn } from '@/utils/cn';
@@ -196,11 +196,7 @@ export function ExplainPage() {
         <AnimatePresence>
           {ask.isPending && (
             <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
-              <div className="flex justify-end">
-                <div className="max-w-[85%] rounded-2xl rounded-br-md border border-primary/30 bg-primary/10 px-4 py-2.5 text-sm text-foreground">
-                  {pendingQuestion.current}
-                </div>
-              </div>
+              <UserBubble content={pendingQuestion.current} />
               <Card className="mt-4 p-5">
                 {ask.rereading && ask.streamed === '' && (
                   <p className="mb-2 text-[11px] text-subtle">
