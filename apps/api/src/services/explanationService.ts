@@ -2,8 +2,7 @@ import type { ExplainResponse } from '@decodr/types';
 import { getAIProvider } from '../ai/providerFactory.js';
 import {
   buildExplanationContext,
-  DETAILED_LIMITS,
-  QUICK_LIMITS,
+  CONTEXT_LIMITS,
 } from '../ai/contextBuilder.js';
 import {
   buildChatMessages,
@@ -40,7 +39,6 @@ export async function explainRepository(
   repositoryId: string,
   question: string,
   opts: {
-    detailed?: boolean;
     history?: HistoryTurn[];
     summary?: string | null;
     /** When present the answer is streamed through these callbacks as it is produced. */
@@ -63,8 +61,7 @@ export async function explainRepository(
     );
   }
 
-  const detailed = opts.detailed ?? false;
-  const limits = detailed ? DETAILED_LIMITS : QUICK_LIMITS;
+  const limits = CONTEXT_LIMITS;
 
   const history = opts.history ?? [];
   const intent = classifyQuestion(trimmed);
@@ -126,10 +123,8 @@ export async function explainRepository(
   opts.stream?.onContext(context.files.map((f) => f.path));
 
   const messages: ChatMessage[] = buildMessages(context, trimmed, {
-    detailed,
     history,
     summary: opts.summary ?? null,
-    overview: intent === 'overview',
   });
 
   // Files the model has already been shown — both the ones retrieval chose and
@@ -138,7 +133,7 @@ export async function explainRepository(
   // Tracked apart from `seen` so the UI can show what the model went and fetched.
   const opened: string[] = [];
   // Headroom for on-demand reads, on top of what retrieval already spent.
-  let readBudget = detailed ? 160_000 : 30_000;
+  let readBudget = READ_BUDGET_CHARS;
 
   const run = (req: Parameters<typeof provider.complete>[0]) => {
     const withSignal = opts.signal ? { ...req, signal: opts.signal } : req;
@@ -154,7 +149,7 @@ export async function explainRepository(
   let result = await run({
     messages,
     temperature: 0.4,
-    maxTokens: detailed ? 9000 : 1400,
+    maxTokens: ANSWER_TOKENS,
     tools: TOOLS,
   });
 
@@ -202,12 +197,41 @@ export async function explainRepository(
     result = await run({
       messages,
       temperature: 0.4,
-      maxTokens: detailed ? 9000 : 1400,
+      maxTokens: ANSWER_TOKENS,
       ...(canReadMore ? { tools: TOOLS } : {}),
     });
   }
 
-  const answer = stripTextToolCalls(result.text).trim();
+  // A model that runs out of budget stops mid-sentence. Ask it to carry on from
+  // where it stopped rather than saving a severed answer — the reader did not
+  // choose the token limit and should not see it.
+  let full = result.text;
+  for (let i = 0; i < MAX_CONTINUATIONS && result.finishReason === 'length'; i += 1) {
+    messages.push({ role: 'assistant', content: result.text });
+    messages.push({
+      role: 'user',
+      content:
+        'That was cut off mid-sentence. Continue from exactly where you stopped. ' +
+        'Do not repeat anything, do not re-introduce the topic, do not start a new ' +
+        'heading unless the previous one genuinely ended — just carry straight on.',
+    });
+    logger.info(`Answer hit the token limit; continuing (${i + 1}/${MAX_CONTINUATIONS})`);
+    result = await run({
+      messages,
+      temperature: 0.4,
+      maxTokens: ANSWER_TOKENS,
+    });
+    // Join without a space: the model resumes mid-sentence.
+    full += result.text;
+  }
+
+  // Still truncated after the allowed continuations: say so rather than leaving
+  // a sentence severed and letting the reader think the model simply trailed off.
+  if (result.finishReason === 'length') {
+    full = `${full.trimEnd()}\n\n_(This answer was cut short. Ask a narrower question, or ask me to continue from here.)_`;
+  }
+
+  const answer = stripTextToolCalls(full).trim();
   // A model that spends its last round on tool calls, or returns nothing, would
   // otherwise be persisted as a blank message the reader cannot act on.
   if (answer.length === 0) {
@@ -296,6 +320,24 @@ async function runTool(
       return { text: `Unknown tool: ${name}`, paths: [] };
   }
 }
+
+/**
+ * Room for the longest answer a question can reasonably need. The model decides
+ * how much of it to use — a one-line question gets a one-line answer — and the
+ * continuation loop covers the rare case where even this runs out.
+ */
+const ANSWER_TOKENS = 4000;
+
+/** Headroom for files the model opens itself, on top of what retrieval sent. */
+const READ_BUDGET_CHARS = 90_000;
+
+/**
+ * How many times an answer may be resumed after hitting the token limit.
+ *
+ * Two is enough for a long walkthrough to finish while keeping the worst case
+ * bounded: a runaway answer cannot spend the budget indefinitely.
+ */
+const MAX_CONTINUATIONS = 2;
 
 /**
  * How many times the model may stop to read more files before it has to answer.

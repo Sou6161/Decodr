@@ -66,8 +66,6 @@ export interface AskRequest {
   /** Omit to start a new conversation; provide to continue an existing one. */
   conversationId?: string;
   question: string;
-  /** Detailed mode sends far more context and produces a longer answer. */
-  detailed?: boolean;
 }
 
 /** Result of asking: the (possibly new) conversation plus the two new messages. */

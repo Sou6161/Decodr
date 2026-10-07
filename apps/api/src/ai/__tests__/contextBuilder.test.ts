@@ -14,7 +14,7 @@ vi.mock('../../repositories/edgeRepository.js', () => ({ edgeRepository: edges }
 vi.mock('../../repositories/routeRepository.js', () => ({ routeRepository: routes }));
 vi.mock('../../repositories/hookRepository.js', () => ({ hookRepository: hooks }));
 
-const { buildExplanationContext, QUICK_LIMITS } = await import('../contextBuilder.js');
+const { buildExplanationContext, CONTEXT_LIMITS } = await import('../contextBuilder.js');
 
 const file = (id: string, path: string, content: string) => ({
   id,
@@ -54,31 +54,31 @@ const paths = (c: { files: { path: string }[] }) => c.files.map((f) => f.path);
 
 describe('buildExplanationContext', () => {
   it('finds the component the question names', async () => {
-    const c = await buildExplanationContext('r', 'explain the Dashboard', QUICK_LIMITS);
+    const c = await buildExplanationContext('r', 'explain the Dashboard', CONTEXT_LIMITS);
     expect(c.focusName).toBe('Dashboard');
     expect(paths(c)).toContain('src/components/Dashboard.tsx');
   });
 
   it('reads source from the database, not the disk', async () => {
     // storagePath points at a directory that does not exist.
-    const c = await buildExplanationContext('r', 'explain the Dashboard', QUICK_LIMITS);
+    const c = await buildExplanationContext('r', 'explain the Dashboard', CONTEXT_LIMITS);
     expect(c.files[0]?.content).toContain('export function Dashboard');
   });
 
   it('pulls in the manifest for stack questions (regression: package.json was never sent)', async () => {
-    const c = await buildExplanationContext('r', 'which AI does this use?', QUICK_LIMITS);
+    const c = await buildExplanationContext('r', 'which AI does this use?', CONTEXT_LIMITS);
     expect(paths(c)).toContain('package.json');
   });
 
   it('keeps two-letter terms as keywords (regression: "AI" was dropped as noise)', async () => {
-    const c = await buildExplanationContext('r', 'which AI is it using', QUICK_LIMITS);
+    const c = await buildExplanationContext('r', 'which AI is it using', CONTEXT_LIMITS);
     // With "ai" discarded there were zero keywords and this fell to a generic path.
     expect(c.files.length).toBeGreaterThan(0);
     expect(paths(c)).toContain('package.json');
   });
 
   it('includes a map naming every file, even ones not sent', async () => {
-    const c = await buildExplanationContext('r', 'explain the Dashboard', QUICK_LIMITS);
+    const c = await buildExplanationContext('r', 'explain the Dashboard', CONTEXT_LIMITS);
     for (const p of ['src/components/Dashboard.tsx', 'src/hooks/useAuth.ts', 'src/unrelated.ts']) {
       expect(c.repoMap).toContain(p);
     }
@@ -89,20 +89,20 @@ describe('buildExplanationContext', () => {
     files.listByRepository.mockResolvedValue(
       Array.from({ length: 50 }, (_, i) => file(`f${i}`, `src/widget${i}.tsx`, 'export const a=1;')),
     );
-    const c = await buildExplanationContext('r', 'explain widget', QUICK_LIMITS);
-    expect(c.files.length).toBeLessThanOrEqual(QUICK_LIMITS.maxFiles);
+    const c = await buildExplanationContext('r', 'explain widget', CONTEXT_LIMITS);
+    expect(c.files.length).toBeLessThanOrEqual(CONTEXT_LIMITS.maxFiles);
   });
 
   it('refuses while the project is still processing', async () => {
     repo.findById.mockResolvedValue({ id: 'r', status: 'ANALYZING', storagePath: '/x' });
-    await expect(buildExplanationContext('r', 'explain', QUICK_LIMITS)).rejects.toThrow(
+    await expect(buildExplanationContext('r', 'explain', CONTEXT_LIMITS)).rejects.toThrow(
       /still processing/i,
     );
   });
 
   it('404s for a repository that does not exist', async () => {
     repo.findById.mockResolvedValue(null);
-    await expect(buildExplanationContext('r', 'explain', QUICK_LIMITS)).rejects.toThrow(
+    await expect(buildExplanationContext('r', 'explain', CONTEXT_LIMITS)).rejects.toThrow(
       /not found/i,
     );
   });

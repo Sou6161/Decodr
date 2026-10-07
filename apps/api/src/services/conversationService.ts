@@ -65,13 +65,12 @@ export const conversationService = {
     repositoryId: string;
     conversationId?: string;
     question: string;
-    detailed?: boolean;
     /** Supplied by the streaming endpoint; the answer is still persisted identically. */
     stream?: ExplainStreamHandlers;
     /** Aborts the model call if the reader stops the answer. */
     signal?: AbortSignal;
   }): Promise<AskResponse> {
-    const { repositoryId, conversationId, question, detailed } = params;
+    const { repositoryId, conversationId, question } = params;
 
     // Verify an existing conversation belongs to this repository up front, and
     // load its turns as the model's memory of the thread.
@@ -119,7 +118,6 @@ export const conversationService = {
     let result;
     try {
       result = await explainRepository(repositoryId, question, {
-        detailed: detailed ?? false,
         history,
         summary: summaryState.summary,
         ...(streamWithCapture ? { stream: streamWithCapture } : {}),

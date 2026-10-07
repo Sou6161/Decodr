@@ -208,7 +208,7 @@ const FEATURES = [
     icon: SparkIcon,
     title: 'Context-aware answers',
     desc: 'A focused slice of the codebase — not the whole thing — reaches the model, so answers stay grounded.',
-    mono: 'graph-driven retrieval · quick / detailed',
+    mono: 'graph-driven retrieval · depth matched to the question',
   },
 ];
 

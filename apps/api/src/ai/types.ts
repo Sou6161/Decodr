@@ -37,6 +37,11 @@ export interface CompletionRequest {
 export interface CompletionResult {
   text: string;
   model: string;
+  /**
+   * Why the model stopped. 'length' means it ran out of budget mid-sentence and
+   * the answer is incomplete — the caller has to ask for the rest.
+   */
+  finishReason?: string;
   /** Tools the model wants run before it can answer. */
   toolCalls?: ToolCall[];
 }

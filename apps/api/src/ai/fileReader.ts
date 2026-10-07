@@ -32,7 +32,7 @@ export const READ_FILES_TOOL: ToolSpec = {
 
 /** Most files one call may open, so a single request cannot blow the budget. */
 const MAX_PATHS_PER_CALL = 6;
-/** Per-file truncation, matching the detailed-mode cap. */
+/** Per-file truncation, matching the context budget's per-file cap. */
 const MAX_CHARS_PER_FILE = 22_000;
 
 export interface ReadResult {

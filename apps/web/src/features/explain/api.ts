@@ -12,7 +12,7 @@ export const explainApi = {
     apiClient.get<ConversationResponse>(`/repositories/${repoId}/conversations/${cid}`),
   ask: (
     repoId: string,
-    body: { conversationId?: string; question: string; detailed?: boolean },
+    body: { conversationId?: string; question: string },
   ) => apiClient.post<AskResponse>(`/repositories/${repoId}/conversations/ask`, body),
   renameConversation: (repoId: string, cid: string, title: string) =>
     apiClient.patch<void>(`/repositories/${repoId}/conversations/${cid}`, { title }),
@@ -46,7 +46,7 @@ const BASE_URL = (import.meta.env.VITE_API_BASE_URL ?? '').replace(/\/$/, '');
  */
 export async function askStream(
   repoId: string,
-  body: { conversationId?: string; question: string; detailed?: boolean },
+  body: { conversationId?: string; question: string },
   handlers: AskStreamHandlers,
   signal?: AbortSignal,
 ): Promise<AskResponse> {

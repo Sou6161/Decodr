@@ -19,7 +19,6 @@ const AskBodySchema = z.object({
     .string()
     .min(3, 'Question is too short')
     .max(4000, 'Question is too long — keep it under 4000 characters'),
-  detailed: z.boolean().optional(),
 });
 
 const RenameBodySchema = z.object({
@@ -57,7 +56,7 @@ export const conversationController = {
    * take a minute, and a spinner for that long reads as a hang.
    */
   async askStream(req: Request, res: Response): Promise<void> {
-    const { conversationId, question, detailed } = AskBodySchema.parse(req.body);
+    const { conversationId, question } = AskBodySchema.parse(req.body);
 
     res.writeHead(200, {
       'Content-Type': 'text/event-stream; charset=utf-8',
@@ -92,7 +91,6 @@ export const conversationController = {
         repositoryId: requireParam(req, 'id'),
         ...(conversationId ? { conversationId } : {}),
         question,
-        ...(detailed !== undefined ? { detailed } : {}),
         signal: controller.signal,
         stream: {
           onStart: (intent) => {
@@ -135,12 +133,11 @@ export const conversationController = {
   },
 
   async ask(req: Request, res: Response): Promise<void> {
-    const { conversationId, question, detailed } = AskBodySchema.parse(req.body);
+    const { conversationId, question } = AskBodySchema.parse(req.body);
     const body: AskResponse = await conversationService.ask({
       repositoryId: requireParam(req, 'id'),
       ...(conversationId ? { conversationId } : {}),
       question,
-      ...(detailed !== undefined ? { detailed } : {}),
     });
     res.status(201).json(body);
   },

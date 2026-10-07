@@ -22,16 +22,22 @@ export interface ContextLimits {
   maxFileChars: number;
   maxTotalChars: number;
 }
-export const QUICK_LIMITS: ContextLimits = {
-  maxFiles: 8,
-  maxFileChars: 6000,
-  maxTotalChars: 45_000,
-};
-export const DETAILED_LIMITS: ContextLimits = {
-  maxFiles: 34,
-  maxFileChars: 22_000,
-  // ~380k chars ≈ 95k tokens, leaving ample room for the prompt + a long answer.
-  maxTotalChars: 380_000,
+/**
+ * One budget for every question.
+ *
+ * There used to be a Quick and a Detailed mode, which asked the reader to
+ * predict how much context their own question needed — a judgement they are not
+ * in a position to make, and which was wrong often enough to matter. This sits
+ * between the two: enough for most questions in a single pass, and when it is
+ * not, the model pulls more itself with read_files and search_code. That escape
+ * hatch is why a large fixed budget is no longer worth paying for on every ask.
+ *
+ * ~110k chars ≈ 27k tokens, leaving room for the prompt and a long answer.
+ */
+export const CONTEXT_LIMITS: ContextLimits = {
+  maxFiles: 14,
+  maxFileChars: 12_000,
+  maxTotalChars: 110_000,
 };
 
 const ROUTING_INTENT = /\b(rout(?:e|es|er|ing)|navigat\w*|url|pathname)\b/i;
@@ -121,7 +127,7 @@ function scoreFile(filePath: string, keywords: string[]): number {
 export async function buildExplanationContext(
   repositoryId: string,
   question: string,
-  limits: ContextLimits = QUICK_LIMITS,
+  limits: ContextLimits = CONTEXT_LIMITS,
 ): Promise<ExplanationContext> {
   const { maxFiles, maxFileChars, maxTotalChars } = limits;
   const repo = await repositoryRepository.findById(repositoryId);

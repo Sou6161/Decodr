@@ -12,8 +12,6 @@ import { exportConversation } from '@/features/explain/exportChat';
 import { Markdown } from '@/features/explain/Markdown';
 import { cn } from '@/utils/cn';
 
-type Mode = 'quick' | 'detailed';
-
 /** Must match the server's schema, or long questions fail only after sending. */
 const MAX_QUESTION = 4000;
 
@@ -24,9 +22,6 @@ export function ExplainPage() {
   const setActive = (id: string | null) => setParams(id ? { c: id } : {});
 
   const [input, setInput] = useState('');
-  const [mode, setMode] = useState<Mode>(
-    () => (localStorage.getItem('decodr.explainMode') as Mode | null) ?? 'detailed',
-  );
   const pendingQuestion = useRef('');
   const scrollAnchor = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
@@ -39,11 +34,6 @@ export function ExplainPage() {
   // "ask about that component" did nothing until you noticed and pressed Ask.
   const seeded = params.get('q');
   const seedHandled = useRef<string | null>(null);
-
-  const setModePersisted = (m: Mode) => {
-    setMode(m);
-    localStorage.setItem('decodr.explainMode', m);
-  };
 
   const active = useConversation(repo.id, activeId);
   const ask = useAsk(repo.id);
@@ -97,7 +87,6 @@ export function ExplainPage() {
     ask.mutate(
       {
         question: q,
-        detailed: mode === 'detailed',
         ...(activeId ? { conversationId: activeId } : {}),
       },
       {
@@ -215,7 +204,7 @@ export function ExplainPage() {
                         ? `Read ${ask.contextFiles.length} file${
                             ask.contextFiles.length === 1 ? '' : 's'
                           } · writing the answer…`
-                        : waitingLabel(ask.intent, mode)}
+                        : waitingLabel(ask.intent)}
                   </div>
                 )}
                 {ask.openedFiles.length > 0 && (
@@ -315,27 +304,11 @@ export function ExplainPage() {
           </div>
 
           <div className="flex items-center gap-2 px-2 pb-0.5 pt-1">
-            <div className="inline-flex rounded-lg border border-border bg-surface-raised p-0.5">
-              {(['quick', 'detailed'] as Mode[]).map((m) => (
-                <button
-                  key={m}
-                  type="button"
-                  onClick={() => setModePersisted(m)}
-                  className={cn(
-                    'rounded-md px-2.5 py-1 text-xs font-medium capitalize transition-colors',
-                    mode === m
-                      ? 'bg-primary text-primary-foreground'
-                      : 'text-muted hover:text-foreground',
-                  )}
-                >
-                  {m}
-                </button>
-              ))}
-            </div>
+            {/* There used to be a Quick/Detailed toggle here. Nobody can judge
+                how much explanation they need before reading the answer, and the
+                question already says: the model matches depth to what was asked. */}
             <span className="text-[11px] text-subtle">
-              {mode === 'detailed'
-                ? 'Full context, exhaustive answer — slower.'
-                : 'Focused answer — fast.'}
+              Answers match the question — ask narrowly for a quick one, broadly for a walkthrough.
             </span>
             {/* Only appears as the limit gets close, so it is not noise. */}
             {input.length > MAX_QUESTION * 0.8 && (
@@ -359,12 +332,10 @@ export function ExplainPage() {
  * What to show while waiting. The server says up front what kind of message this
  * is, so a greeting no longer claims the codebase is being read.
  */
-function waitingLabel(intent: Mode | string | null, mode: Mode): string {
+function waitingLabel(intent: string | null): string {
   if (intent === 'smalltalk') return 'Typing…';
   if (intent === 'overview') return 'Getting an overall picture of the project…';
-  if (intent === 'code') {
-    return mode === 'detailed' ? 'Reading the codebase in depth…' : 'Reading the relevant files…';
-  }
+  if (intent === 'code') return 'Reading the relevant files…';
   // Intent not known yet — say nothing that might turn out to be false.
   return 'Thinking…';
 }

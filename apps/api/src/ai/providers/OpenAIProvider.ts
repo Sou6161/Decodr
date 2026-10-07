@@ -250,10 +250,13 @@ export class OpenAIProvider implements AIProvider {
 
       let text = '';
       let answered = model;
+      let finishReason: string | undefined;
       const partial = new Map<number, { id: string; name: string; args: string }>();
 
       for await (const chunk of iterator) {
         if (chunk.model) answered = chunk.model;
+        const reason = chunk.choices[0]?.finish_reason;
+        if (reason) finishReason = reason;
         const delta = chunk.choices[0]?.delta;
         if (!delta) continue;
 
@@ -272,7 +275,12 @@ export class OpenAIProvider implements AIProvider {
       }
 
       const toolCalls: ToolCall[] = [...partial.values()].filter((c) => c.id && c.name);
-      return { text, model: answered, ...(toolCalls.length ? { toolCalls } : {}) };
+      return {
+        text,
+        model: answered,
+        ...(finishReason ? { finishReason } : {}),
+        ...(toolCalls.length ? { toolCalls } : {}),
+      };
     } catch (err) {
       // Rethrown as-is: withFallback needs the real status to decide whether
       // another model could do better. Converting here erased it.
@@ -316,7 +324,13 @@ export class OpenAIProvider implements AIProvider {
         args: c.function.arguments,
       }));
 
-      return { text, model: response.model, ...(toolCalls?.length ? { toolCalls } : {}) };
+      const finishReason = response.choices[0]?.finish_reason;
+      return {
+        text,
+        model: response.model,
+        ...(finishReason ? { finishReason } : {}),
+        ...(toolCalls?.length ? { toolCalls } : {}),
+      };
     } catch (err) {
       throw err;
     }

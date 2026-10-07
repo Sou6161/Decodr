@@ -44,7 +44,7 @@ export function useAsk(repoId: string) {
   const abortRef = useRef<AbortController | null>(null);
 
   const mutation = useMutation({
-    mutationFn: (vars: { conversationId?: string; question: string; detailed?: boolean }) => {
+    mutationFn: (vars: { conversationId?: string; question: string }) => {
       setStreamed('');
       setOpenedFiles([]);
       setIntent(null);

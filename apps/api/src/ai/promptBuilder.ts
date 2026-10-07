@@ -117,8 +117,6 @@ function fence(filePath: string): string {
   return LANG_BY_EXT[path.extname(filePath).toLowerCase()] ?? '';
 }
 
-const DETAILED_NOTE =
-  'MODE: DETAILED. They asked for depth, so go wide: 600 words or more if the material supports it. Trace the full flow end to end, cover the secondary paths (loading, error and empty states, edge cases, important types and helpers), name the files involved as you pass through them, and explain why it is built this way rather than only what it does. Open more files with read_files if the attached ones do not cover it. Show code wherever it genuinely clarifies — in a deep walkthrough that is often — but still only where it adds something a sentence could not. Length must come from covering more ground, never from padding. If the project genuinely does not contain enough material to go deep, say so plainly instead of repeating yourself.';
 
 /**
  * Persona for messages that are not questions about specific code. The
@@ -193,14 +191,24 @@ const MAP_NOTE =
   'find_usages answers "where is X used?" from the import graph. get_component locates a definition without opening the file. ' +
   'Never describe or quote the contents of a file you have not actually read — open it instead.';
 
-const OVERVIEW_NOTE =
-  'MODE: OVERVIEW. They want the big picture of the whole project, not a deep dive into one file. Start with what this app appears to be and what it does, then describe how it is organised — the main areas, how they fit together, and where someone should start reading. Keep code snippets to a minimum here; one or two short ones at most, only where they make a structural point. End by suggesting two specific things they could ask about next.';
 
 const FOLLOWUP_NOTE =
   'This is a follow-up in an ongoing conversation — the earlier turns are above. Resolve pronouns and shorthand ("it", "that function", "why?") against what was already discussed, and do not re-explain ground you already covered; build on it. The files attached below are freshly selected for THIS question, so they may differ from the earlier ones.';
 
-const QUICK_NOTE =
-  'MODE: QUICK. Under 120 words. Answer exactly what was asked in plain prose and stop — no preamble, no background, no secondary flows, no edge cases, no closing summary. One short paragraph is usually right. Include a snippet ONLY if the exact code is the thing being asked about; most quick answers need none. If they want more they will ask.';
+/**
+ * Replaces the old Quick/Detailed toggle. A reader should not have to predict
+ * how much explanation they need before they ask; the question itself already
+ * says. "Where is the router set up?" wants a line, "walk me through auth"
+ * wants a walkthrough, and the same person asks both in one thread.
+ */
+const LENGTH_NOTE =
+  'LENGTH: let the question decide, and answer at the depth it actually asks for. ' +
+  'A narrow factual question ("where is X", "what does this prop do", "which file holds Y") gets a direct answer in a sentence or two and then stops — no preamble, no background, no secondary flows, no closing summary. ' +
+  'A broad or explanatory question ("how does X work", "walk me through", "explain the data flow", "why is it built this way") gets a real walkthrough: trace the flow end to end, cover the paths that matter including loading, error and empty states and the important edge cases, name the files as you pass through them, and say why it is built that way and not only what it does. Open more files with read_files when the attached ones do not cover it. ' +
+  'If someone asks about the project as a whole, describe what the app is and how it is organised — the main areas, how they fit together, where to start reading — and keep snippets structural and few. ' +
+  'Show code only where it clarifies something a sentence could not; in a deep walkthrough that is often, in a one-line answer it is usually never. ' +
+  'Length must always come from covering more ground, never from padding — if the project does not hold enough material to go deep, say so plainly instead of repeating yourself. ' +
+  'When the question is ambiguous about depth, start with the direct answer and offer to go deeper rather than pre-emptively writing an essay.';
 
 /** A prior turn in the same conversation, oldest first. */
 export interface HistoryTurn {
@@ -262,10 +270,8 @@ export function buildMessages(
   context: ExplanationContext,
   question: string,
   opts: {
-    detailed?: boolean;
     history?: HistoryTurn[];
     summary?: string | null;
-    overview?: boolean;
   } = {},
 ): ChatMessage[] {
   const header: string[] = [];
@@ -282,7 +288,7 @@ export function buildMessages(
     .join('\n\n');
 
   const userContent = [
-    opts.overview ? OVERVIEW_NOTE : opts.detailed ? DETAILED_NOTE : QUICK_NOTE,
+    LENGTH_NOTE,
     context.guessed ? GUESSED_NOTE : '',
     context.repoMap,
     MAP_NOTE,
