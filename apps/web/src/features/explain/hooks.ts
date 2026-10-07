@@ -33,6 +33,9 @@ export function useAsk(repoId: string) {
   const [streamed, setStreamed] = useState('');
   const [openedFiles, setOpenedFiles] = useState<string[]>([]);
   const [intent, setIntent] = useState<AskIntent | null>(null);
+  // The question that failed, kept so the thread can offer to run it again.
+  // A toast disappears; a failed turn you can retry does not.
+  const [failed, setFailed] = useState<{ question: string; message: string } | null>(null);
   const [contextFiles, setContextFiles] = useState<string[]>([]);
   // Set while the model is re-reading after opening files, so the UI can
   // explain why the text it was showing just cleared.
@@ -79,7 +82,7 @@ export function useAsk(repoId: string) {
       setContextFiles([]);
       setRereading(false);
     },
-    onError: (error) => {
+    onError: (error, vars) => {
       // AbortError means the reader pressed Stop — not something to apologise for.
       if (error instanceof Error && error.name === 'AbortError') {
         setStreamed('');
@@ -95,7 +98,7 @@ export function useAsk(repoId: string) {
           : error instanceof Error
             ? error.message
             : 'Something went wrong generating the explanation.';
-      toast.error('Explanation failed', message);
+      setFailed({ question: vars.question, message });
       setStreamed('');
       setOpenedFiles([]);
       setIntent(null);
@@ -108,6 +111,8 @@ export function useAsk(repoId: string) {
   const stop = () => abortRef.current?.abort();
 
   return Object.assign(mutation, {
+    failed,
+    dismissFailure: () => setFailed(null),
     streamed,
     openedFiles,
     intent,

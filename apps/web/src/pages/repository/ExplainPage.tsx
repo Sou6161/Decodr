@@ -102,8 +102,6 @@ export function ExplainPage() {
       },
       {
         onSuccess: ({ conversation }) => setActive(conversation.id),
-        // Losing the question on failure means retyping it. Put it back.
-        onError: () => setInput(q),
       },
     );
   };
@@ -233,6 +231,24 @@ export function ExplainPage() {
             </motion.div>
           )}
         </AnimatePresence>
+
+        {/* A failed answer stays in the thread with a way to run it again,
+            rather than vanishing with a toast and leaving no trace of what
+            was asked or why it did not work. */}
+        {ask.failed && !ask.isPending && (
+          <Card className="border-danger/40 p-4">
+            <UserBubble content={ask.failed.question} />
+            <p className="mt-3 text-sm text-muted">{ask.failed.message}</p>
+            <div className="mt-3 flex gap-2">
+              <Button size="sm" onClick={() => submit(ask.failed!.question)}>
+                Try again
+              </Button>
+              <Button size="sm" variant="ghost" onClick={() => ask.dismissFailure()}>
+                Dismiss
+              </Button>
+            </div>
+          </Card>
+        )}
 
         {/* Next questions drawn from the graph around what was just read, so
             they point somewhere real rather than being generic prompts. */}

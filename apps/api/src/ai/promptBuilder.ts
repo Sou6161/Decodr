@@ -209,7 +209,15 @@ export interface HistoryTurn {
 }
 
 /** How much earlier conversation to replay verbatim, and how much of each answer. */
-export const MAX_HISTORY_TURNS = 8;
+/**
+ * How much of the thread is replayed verbatim.
+ *
+ * Raised from 8 once code blocks were being stripped from replayed answers:
+ * 12 turns now costs about what 8 did before (~2k tokens, under a fifth of the
+ * Quick budget), and a conversation stays coherent noticeably longer. Older
+ * turns are not lost — they fold into the rolling summary.
+ */
+export const MAX_HISTORY_TURNS = 12;
 const MAX_HISTORY_ANSWER_CHARS = 1200;
 
 /**

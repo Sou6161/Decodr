@@ -28,6 +28,13 @@ const EnvSchema = z.object({
     .nativeEnum(AIProviderName)
     .default(AIProviderName.OpenAI),
   AI_MODEL: z.string().default('gpt-4o-mini'),
+  /**
+   * Models to try, in order, when the primary one fails for a reason another
+   * model could survive — overload, rate limits, exhausted credits. Free pools
+   * are shared and rate-limit without warning, so one model is a single point
+   * of failure.
+   */
+  AI_FALLBACK_MODELS: z.string().optional().default(''),
   OPENAI_API_KEY: z.string().optional().default(''),
   /** Optional override for OpenAI-compatible gateways (e.g. OpenRouter). */
   OPENAI_BASE_URL: z.string().optional().default(''),
@@ -68,6 +75,12 @@ export const storageRoot = path.isAbsolute(env.STORAGE_DIR)
   : path.resolve(__dirname, '../../', env.STORAGE_DIR);
 
 export const isProd = env.NODE_ENV === 'production';
+
+/** The primary model followed by its fallbacks, de-duplicated. */
+export const modelChain: string[] = [
+  env.AI_MODEL,
+  ...env.AI_FALLBACK_MODELS.split(',').map((m) => m.trim()).filter(Boolean),
+].filter((m, i, all) => all.indexOf(m) === i);
 
 /**
  * Every origin allowed by CORS. WEB_ORIGIN may list several, comma-separated,

@@ -82,7 +82,10 @@ export async function explainRepository(
       ...(opts.signal ? { signal: opts.signal } : {}),
     };
     const result = opts.stream
-      ? await provider.stream(req, { onDelta: opts.stream.onDelta })
+      ? await provider.stream(req, {
+          onDelta: opts.stream.onDelta,
+          onRestart: opts.stream.onReset,
+        })
       : await provider.complete(req);
     const reply = result.text.trim();
     if (reply.length === 0) {
@@ -140,7 +143,11 @@ export async function explainRepository(
   const run = (req: Parameters<typeof provider.complete>[0]) => {
     const withSignal = opts.signal ? { ...req, signal: opts.signal } : req;
     return opts.stream
-      ? provider.stream(withSignal, { onDelta: opts.stream.onDelta })
+      ? provider.stream(withSignal, {
+          onDelta: opts.stream.onDelta,
+          // A model swap mid-answer discards what was shown, same as a tool round.
+          onRestart: opts.stream.onReset,
+        })
       : provider.complete(withSignal);
   };
 

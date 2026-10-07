@@ -50,6 +50,14 @@ export interface CompletionResult {
 export interface StreamHandlers {
   /** A chunk of answer text. */
   onDelta: (text: string) => void;
+  /**
+   * Discard everything streamed so far and start again.
+   *
+   * A model can fail partway through an answer, after the reader has already
+   * seen some of it. The next model in the chain begins from scratch, so
+   * without this the two halves would be concatenated into nonsense.
+   */
+  onRestart?: () => void;
 }
 
 export interface AIProvider {

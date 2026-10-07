@@ -1,5 +1,5 @@
 import { AIProviderName } from '@decodr/types';
-import { env, primaryOrigin } from '../config/env.js';
+import { env, modelChain, primaryOrigin } from '../config/env.js';
 import { logger } from '../utils/logger.js';
 import type { AIProvider } from './types.js';
 import { OpenAIProvider } from './providers/OpenAIProvider.js';
@@ -15,6 +15,7 @@ export function createAIProvider(): AIProvider {
       return new OpenAIProvider({
         apiKey: env.OPENAI_API_KEY,
         model: env.AI_MODEL,
+        fallbacks: modelChain.slice(1),
         baseURL: env.OPENAI_BASE_URL,
         // OpenRouter attribution headers (harmless/ignored by other providers).
         headers: {
@@ -43,7 +44,8 @@ export function getAIProvider(): AIProvider {
   if (!provider) {
     provider = createAIProvider();
     logger.info(
-      `AI provider initialized: ${provider.name} (${provider.model}), configured=${provider.isConfigured()}`,
+      `AI provider initialized: ${provider.name} (${modelChain.join(' -> ')}), ` +
+        `configured=${provider.isConfigured()}`,
     );
   }
   return provider;
