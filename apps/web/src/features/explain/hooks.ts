@@ -50,6 +50,12 @@ export function useAsk(repoId: string) {
   const [rereading, setRereading] = useState(false);
   // Held so the reader can stop an answer in progress.
   const abortRef = useRef<AbortController | null>(null);
+  // The thread the server opened for this question, announced before the answer.
+  // Kept in a ref so learning it does not re-render mid-stream.
+  const startedConversation = useRef<string | null>(null);
+  // Set when an answer is stopped on a thread the page is not showing yet, so
+  // the page can switch to it and reveal what was saved.
+  const [recovered, setRecovered] = useState<string | null>(null);
 
   const mutation = useMutation({
     mutationFn: (vars: { conversationId?: string; question: string }) => {
@@ -59,7 +65,11 @@ export function useAsk(repoId: string) {
       setContextFiles([]);
       setRereading(false);
       abortRef.current = new AbortController();
+      startedConversation.current = null;
       return askStream(repoId, vars, {
+        onConversation: (id) => {
+          startedConversation.current = id;
+        },
         onStart: setIntent,
         onContext: setContextFiles,
         onDelta: (text) => {
@@ -105,6 +115,22 @@ export function useAsk(repoId: string) {
     onError: (error, vars) => {
       // AbortError means the reader pressed Stop — not something to apologise for.
       if (error instanceof Error && error.name === 'AbortError') {
+        // The server saves what was written before the stop, marked as
+        // incomplete. Nothing refetched it, so the text the reader was part way
+        // through vanished from the screen and only came back on a reload —
+        // which looks exactly like losing it.
+        const thread = vars.conversationId ?? startedConversation.current;
+        void queryClient.invalidateQueries({ queryKey: conversationKeys.all(repoId) });
+        if (thread) {
+          void queryClient.invalidateQueries({
+            queryKey: conversationKeys.detail(repoId, thread),
+          });
+        }
+        // A stop on the first message of a new thread: the page is not showing
+        // that thread yet, so it has to be told to open it.
+        if (!vars.conversationId && startedConversation.current) {
+          setRecovered(startedConversation.current);
+        }
         setStreamed('');
         setOpenedFiles([]);
         setIntent(null);
@@ -131,6 +157,9 @@ export function useAsk(repoId: string) {
   const stop = () => abortRef.current?.abort();
 
   return Object.assign(mutation, {
+    /** A stopped new thread the page should switch to, once. */
+    recovered,
+    clearRecovered: () => setRecovered(null),
     failed,
     dismissFailure: () => setFailed(null),
     streamed,

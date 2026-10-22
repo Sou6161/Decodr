@@ -160,10 +160,15 @@ export function UserBubble({
   onEdit?: () => void;
 }) {
   return (
-    <div className="group flex flex-col items-end">
-      <div className="flex justify-end">
-      {/* whitespace-pre-wrap: a multi-line question the user typed should keep
-          the shape they gave it rather than collapsing into one run-on line. */}
+    // w-full on both wrappers, which is load-bearing: `items-end` makes a
+    // column's children shrink to fit, so `max-w-[85%]` on the bubble was
+    // resolving against a box that was itself sized by the bubble. The browser
+    // settles that circular constraint at a few characters wide, which is why
+    // "hi man" came out broken across two lines.
+    <div className="group flex w-full flex-col items-end">
+      <div className="flex w-full justify-end">
+        {/* whitespace-pre-wrap: a multi-line question the user typed should keep
+            the shape they gave it rather than collapsing into one run-on line. */}
         <div className="max-w-[85%] whitespace-pre-wrap rounded-2xl rounded-br-md border border-primary/30 bg-primary/10 px-4 py-2.5 text-sm leading-relaxed text-foreground">
           {content}
         </div>

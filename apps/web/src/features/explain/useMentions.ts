@@ -9,12 +9,22 @@ import { useMemo, useState } from 'react';
  * instead of letting it compete on score.
  */
 
-/** How many suggestions to show. Enough to choose from, few enough to scan. */
-const MAX_SUGGESTIONS = 7;
+/**
+ * How many matches to render.
+ *
+ * Was 7, which meant a bare `@` offered the first seven paths alphabetically —
+ * in a monorepo that is seven files from `apps/api`, none of which anyone was
+ * looking for. The menu scrolls, so the honest thing is to show the project and
+ * let typing narrow it; the cap only exists to stop a thousand-file repo
+ * building a thousand DOM nodes on every keystroke.
+ */
+const MAX_SUGGESTIONS = 50;
 
 export interface MentionState {
   /** Paths to offer, best match first. Empty when the menu should be hidden. */
   suggestions: string[];
+  /** How many matched in total, which may exceed what is rendered. */
+  total: number;
   /** Which suggestion is selected, for arrow keys and Enter. */
   active: number;
   setActive: (i: number) => void;
@@ -43,10 +53,23 @@ function activeToken(value: string, caret: number): { start: number; query: stri
   return { start: at, query };
 }
 
+/**
+ * Source files people actually mean when they point at something, ranked above
+ * config and generated noise. Used to order the list before anything is typed.
+ */
+const INTERESTING = /\.(tsx|jsx|ts|js)$/i;
+const BORING = /(^|\/)(\.|dist\/|build\/|coverage\/)|\.(json|lock|md|ya?ml|txt|example)$/i;
+
 /** Ranks paths against what has been typed: filename matches beat path matches. */
-function rank(paths: string[], query: string): string[] {
+function rank(paths: string[], query: string): { matches: string[]; total: number } {
   const q = query.toLowerCase();
-  if (q.length === 0) return paths.slice(0, MAX_SUGGESTIONS);
+
+  // Nothing typed yet: lead with the files someone is plausibly about to name —
+  // components and modules — rather than whatever sorts first alphabetically.
+  if (q.length === 0) {
+    const ordered = [...paths].sort((a, b) => weight(b) - weight(a) || a.localeCompare(b));
+    return { matches: ordered.slice(0, MAX_SUGGESTIONS), total: paths.length };
+  }
 
   const scored: { path: string; score: number }[] = [];
   for (const path of paths) {
@@ -57,10 +80,16 @@ function rank(paths: string[], query: string): string[] {
     const score = file.startsWith(q) ? 3 : file.includes(q) ? 2 : lower.includes(q) ? 1 : 0;
     if (score > 0) scored.push({ path, score });
   }
-  return scored
-    .sort((a, b) => b.score - a.score || a.path.length - b.path.length)
-    .slice(0, MAX_SUGGESTIONS)
-    .map((s) => s.path);
+  const sorted = scored
+    .sort((a, b) => b.score - a.score || weight(b.path) - weight(a.path) || a.path.length - b.path.length)
+    .map((x) => x.path);
+  return { matches: sorted.slice(0, MAX_SUGGESTIONS), total: sorted.length };
+}
+
+/** Higher sorts earlier: real source first, config and dotfiles last. */
+function weight(path: string): number {
+  if (BORING.test(path)) return 0;
+  return INTERESTING.test(path) ? 2 : 1;
 }
 
 export function useMentions(
@@ -74,8 +103,8 @@ export function useMentions(
   // Keyed on the query text, not on `token`, which is a fresh object every
   // render and would defeat the memo entirely.
   const query = token?.query ?? null;
-  const suggestions = useMemo(
-    () => (query === null ? [] : rank(paths, query)),
+  const { matches: suggestions, total } = useMemo(
+    () => (query === null ? { matches: [], total: 0 } : rank(paths, query)),
     [query, paths],
   );
 
@@ -87,6 +116,7 @@ export function useMentions(
 
   return {
     suggestions,
+    total,
     active: Math.min(active, Math.max(suggestions.length - 1, 0)),
     setActive,
     open,

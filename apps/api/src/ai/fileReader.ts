@@ -32,7 +32,14 @@ export const READ_FILES_TOOL: ToolSpec = {
 
 /** Most files one call may open, so a single request cannot blow the budget. */
 const MAX_PATHS_PER_CALL = 6;
-/** Per-file truncation, matching the context budget's per-file cap. */
+/**
+ * Per-file truncation for a file the model opens itself.
+ *
+ * Deliberately larger than retrieval's per-file cap: retrieval attaches a dozen
+ * files on a guess, while a file opened by name is one the model decided it
+ * needed, and clipping that is how an answer ends up describing the top of a
+ * file and inventing the rest.
+ */
 const MAX_CHARS_PER_FILE = 22_000;
 
 export interface ReadResult {
@@ -66,6 +73,15 @@ export async function runReadFiles(
     return { text: 'Those files were already provided above.', paths: [] };
   }
 
+  // Claim the paths NOW, before the first await.
+  //
+  // A round's tool calls run concurrently, and marking files as read only after
+  // fetching them left a window where two calls asking for the same file both
+  // saw it as unread: the source went into the prompt twice, the budget was
+  // charged twice, and the reader was told two files had been opened. Reserving
+  // synchronously closes the window, since nothing else can run in between.
+  for (const path of wanted) alreadyRead.add(path);
+
   const rows = await fileRepository.findByPaths(repositoryId, wanted);
   const found = new Map(rows.map((r) => [r.path, r.content]));
 
@@ -76,10 +92,14 @@ export async function runReadFiles(
   for (const path of wanted) {
     const content = found.get(path);
     if (content == null) {
+      // Release the claim: nothing was shown, so a later call naming the right
+      // path must not be told it was "already provided above".
+      alreadyRead.delete(path);
       blocks.push(`FILE: ${path}\n(not found in this project)`);
       continue;
     }
     if (used >= budgetChars) {
+      alreadyRead.delete(path);
       blocks.push(`FILE: ${path}\n(skipped — context budget reached)`);
       continue;
     }
@@ -87,7 +107,6 @@ export async function runReadFiles(
     const body = content.length > cap ? `${content.slice(0, cap)}\n… (truncated)` : content;
     blocks.push(`FILE: ${path}\n${body}`);
     paths.push(path);
-    alreadyRead.add(path);
     used += body.length;
   }
 

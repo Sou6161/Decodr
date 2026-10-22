@@ -1,6 +1,7 @@
 import type { FileContentResponse } from '@decodr/types';
 import { fileRepository } from '../repositories/fileRepository.js';
 import { AppError } from '../utils/AppError.js';
+import { STORED_CONTENT_LIMIT } from './repositoryProcessor.js';
 
 /**
  * Serves stored source to the reader.
@@ -10,9 +11,6 @@ import { AppError } from '../utils/AppError.js';
  * to your editor. The source is already in Postgres — the upload's disk copy is
  * ephemeral on Render — so serving it is just a lookup.
  */
-
-/** Matches the cap the processor applies when storing source. */
-const STORED_CONTENT_LIMIT = 64_000;
 
 export const fileService = {
   /** Every path in the repository, for mention autocomplete and the file list. */

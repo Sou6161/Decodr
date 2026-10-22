@@ -82,3 +82,31 @@ describe('read budget accounting', () => {
     expect(r.paths).toEqual([]);
   });
 });
+
+describe('runReadFiles concurrency', () => {
+  it('does not serve the same file twice when a round reads in parallel', async () => {
+    // A round's tool calls run concurrently against one shared `seen` set. If a
+    // path is only marked as read after the fetch, both calls read it: the
+    // source lands in the prompt twice and the reader is told two files were
+    // opened. Reserving before the first await is what prevents that.
+    findByPaths.mockResolvedValue([{ path: 'src/App.tsx', content: 'export const App = 1;' }]);
+    const seen = new Set<string>();
+    const args = JSON.stringify({ paths: ['src/App.tsx'] });
+
+    const [a, b] = await Promise.all([
+      runReadFiles('repo-1', args, seen, 50_000),
+      runReadFiles('repo-1', args, seen, 50_000),
+    ]);
+
+    const served = [...a.paths, ...b.paths];
+    expect(served).toEqual(['src/App.tsx']);
+    expect([a.text, b.text].filter((t) => t.includes('Those files were already provided'))).toHaveLength(1);
+  });
+
+  it('releases a claim on a path that does not exist, so a later call can retry', async () => {
+    findByPaths.mockResolvedValue([]);
+    const seen = new Set<string>();
+    await runReadFiles('repo-1', JSON.stringify({ paths: ['src/Ghost.tsx'] }), seen, 50_000);
+    expect(seen.has('src/Ghost.tsx')).toBe(false);
+  });
+});

@@ -15,7 +15,7 @@ import { analyzeAndPersist } from './analysisService.js';
  * so anything beyond this is never sent to the model — storing more would only
  * grow the database.
  */
-const STORED_CONTENT_LIMIT = 64_000;
+export const STORED_CONTENT_LIMIT = 64_000;
 
 /** A file staged on disk (temp path) with the repo-relative path it should live at. */
 export interface StagedFile {

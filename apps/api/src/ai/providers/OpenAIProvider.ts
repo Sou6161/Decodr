@@ -274,7 +274,15 @@ export class OpenAIProvider implements AIProvider {
         }
       }
 
-      const toolCalls: ToolCall[] = [...partial.values()].filter((c) => c.id && c.name);
+      // A streamed tool call is dropped only when it has no NAME — without one
+      // there is nothing to dispatch. A missing id is survivable: it exists to
+      // pair the result message back to the call, so any stable stand-in works,
+      // and some providers never send one. Requiring it meant the model asked
+      // to read a file, the request was silently discarded, and the answer came
+      // back built on whatever it had already guessed.
+      const toolCalls: ToolCall[] = [...partial.entries()]
+        .filter(([, c]) => c.name)
+        .map(([index, c]) => ({ ...c, id: c.id || `call_${index}` }));
       return {
         text,
         model: answered,
@@ -318,11 +326,13 @@ export class OpenAIProvider implements AIProvider {
         if (typeof reasoning === 'string') text = reasoning;
       }
       const rawCalls = (message as { tool_calls?: RawToolCall[] } | undefined)?.tool_calls;
-      const toolCalls = rawCalls?.map((c) => ({
-        id: c.id,
-        name: c.function.name,
-        args: c.function.arguments,
-      }));
+      const toolCalls = rawCalls
+        ?.filter((c) => c.function?.name)
+        .map((c, i) => ({
+          id: c.id || `call_${i}`,
+          name: c.function.name,
+          args: c.function.arguments,
+        }));
 
       const finishReason = response.choices[0]?.finish_reason;
       return {

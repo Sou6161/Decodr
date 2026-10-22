@@ -100,6 +100,15 @@ export function ExplainPage() {
     return () => window.removeEventListener('scroll', onScroll);
   }, []);
 
+  // Stopping the first answer of a new thread saves it server-side under a
+  // conversation the page has not opened yet. Switch to it so the partial
+  // answer is on screen rather than only in the sidebar.
+  useEffect(() => {
+    if (!ask.recovered) return;
+    setActive(ask.recovered);
+    ask.clearRecovered();
+  }, [ask]);
+
   // Esc stops a running answer, matching what people expect from a chat.
   useEffect(() => {
     if (!ask.isPending) return;
@@ -441,7 +450,7 @@ export function ExplainPage() {
             <ul
               role="listbox"
               aria-label="Files"
-              className="absolute bottom-full left-0 mb-2 max-h-64 w-full overflow-y-auto rounded-xl border border-border bg-surface p-1 shadow-xl shadow-black/30"
+              className="absolute bottom-full left-0 mb-2 max-h-80 w-full overflow-y-auto rounded-xl border border-border bg-surface p-1 shadow-xl shadow-black/30"
             >
               {mentions.suggestions.map((path, i) => (
                 <li key={path}>
@@ -463,6 +472,12 @@ export function ExplainPage() {
                   </button>
                 </li>
               ))}
+              {mentions.total > mentions.suggestions.length && (
+                <li className="px-2.5 py-1.5 text-[11px] text-subtle">
+                  +{mentions.total - mentions.suggestions.length} more — keep typing to narrow it
+                  down
+                </li>
+              )}
             </ul>
           )}
           <div className="flex items-end gap-2">
@@ -474,7 +489,16 @@ export function ExplainPage() {
                 setCaret(e.target.selectionStart);
               }}
               onClick={(e) => setCaret(e.currentTarget.selectionStart)}
-              onKeyUp={(e) => setCaret(e.currentTarget.selectionStart)}
+              onKeyUp={(e) => {
+                // Enter and Tab may have just accepted a mention, which rewrote
+                // the value and moved the caret itself. The textarea has not
+                // re-rendered yet, so reading selectionStart here reports the
+                // position from BEFORE the insertion — which put the caret back
+                // inside the mention that was just completed and reopened the
+                // menu on a stale query.
+                if (e.key === 'Enter' || e.key === 'Tab') return;
+                setCaret(e.currentTarget.selectionStart);
+              }}
               onKeyDown={(e) => {
                 // While the mention menu is open it owns the arrows, Tab, Enter
                 // and Escape — pressing Enter to pick a file must not also send

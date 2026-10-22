@@ -63,6 +63,12 @@ export const explainApi = {
 export type AskIntent = 'smalltalk' | 'general' | 'overview' | 'code';
 
 export interface AskStreamHandlers {
+  /**
+   * The thread this answer is being written into, for a new conversation.
+   * Arrives before the answer, so a stop or a dropped connection still leaves
+   * the reader somewhere they can find what was saved.
+   */
+  onConversation: (conversationId: string) => void;
   /** Fired before any slow work, so the UI can describe it honestly. */
   onStart: (intent: AskIntent) => void;
   /** Files retrieval selected, available within milliseconds of asking. */
@@ -127,7 +133,8 @@ export async function askStream(
       if (!event || !raw) continue;
       const data = JSON.parse(raw) as Record<string, never>;
 
-      if (event === 'start') handlers.onStart(data.intent as unknown as AskIntent);
+      if (event === 'conversation') handlers.onConversation(data.id as unknown as string);
+      else if (event === 'start') handlers.onStart(data.intent as unknown as AskIntent);
       else if (event === 'context') handlers.onContext(data.paths as unknown as string[]);
       else if (event === 'delta') handlers.onDelta(data.text as unknown as string);
       else if (event === 'files') handlers.onFiles(data.paths as unknown as string[]);

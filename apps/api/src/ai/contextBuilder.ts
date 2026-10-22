@@ -181,7 +181,8 @@ export async function buildExplanationContext(
 
   // A mentioned file is the subject, whatever the keywords say. Kept separate
   // from `manifestPaths` so it sorts ahead of them too.
-  const pinnedPaths = pinned.filter((p) => fileById.size === 0 || allFiles.some((f) => f.path === p));
+  const knownPaths = new Set(allFiles.map((f) => f.path));
+  const pinnedPaths = pinned.filter((p) => knownPaths.has(p));
 
   // Rank components and files by how well they match the question keywords.
   const scoredComponents = components

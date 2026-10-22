@@ -19,6 +19,7 @@ import type { HistoryTurn } from '../ai/promptBuilder.js';
 import { maybeExtendSummary, type SummaryState } from '../ai/summarizer.js';
 import { fallbackTitle, generateTitle } from '../ai/titler.js';
 import { generateFollowUps } from '../ai/followUps.js';
+import { classifyQuestion } from '../ai/intent.js';
 import { AppError } from '../utils/AppError.js';
 import { logger } from '../utils/logger.js';
 
@@ -157,8 +158,15 @@ export const conversationService = {
   },
 
   /**
-   * Answers a question and persists it. The AI call runs *first*, so a failure
-   * (e.g. provider error) never leaves an orphaned conversation.
+   * Answers a question and persists it.
+   *
+   * A new thread's conversation row is created BEFORE the model is called, and
+   * its id is announced on the stream. The AI call used to run first so that a
+   * provider error could not leave an orphaned conversation — but it also meant
+   * the reader's browser did not learn the thread's id until the answer
+   * finished, so stopping the very first answer left the saved text reachable
+   * only from the sidebar. The orphan is prevented explicitly instead: a thread
+   * created here is deleted again if the question fails with nothing to keep.
    *
    * Each question builds its own focused context, but the earlier turns of the
    * thread are replayed to the model, so follow-ups ("why?", "what about the
@@ -209,6 +217,14 @@ export const conversationService = {
       .slice(0, RELATED_THREADS)
       .map((c) => c.title);
 
+    // Create the thread up front so the reader's browser knows where the answer
+    // is being written, even if the connection never delivers it.
+    const isNewThread = !conversationId;
+    const conversation =
+      conversationId ??
+      (await conversationRepository.create(repositoryId, fallbackTitle(question))).id;
+    if (isNewThread) params.stream?.onConversation?.(conversation);
+
     // Mirror the streamed text so a stopped answer can still be saved — losing
     // what someone already read is worse than keeping it marked as incomplete.
     let partial = '';
@@ -226,7 +242,8 @@ export const conversationService = {
         }
       : undefined;
 
-    // Generate the answer before writing anything.
+    // Generate the answer. Only the empty thread exists at this point; no
+    // messages are written until there is something to write.
     let result;
     try {
       result = await explainRepository(repositoryId, question, {
@@ -239,7 +256,16 @@ export const conversationService = {
     } catch (err) {
       const stopped = params.signal?.aborted ?? false;
       // A stop with nothing written yet has nothing worth keeping.
-      if (!stopped || partial.trim().length === 0) throw err;
+      if (!stopped || partial.trim().length === 0) {
+        // Nothing was saved, so a thread created for this question would sit in
+        // the sidebar empty. Remove it; an existing thread is left alone.
+        if (isNewThread) {
+          await conversationRepository
+            .delete(conversation, repositoryId)
+            .catch((e) => logger.error('Could not clean up an empty conversation', e));
+        }
+        throw err;
+      }
       result = {
         answer: `${partial.trim()}\n\n_(stopped)_`,
         provider: AIProviderName.OpenAI,
@@ -251,11 +277,6 @@ export const conversationService = {
         truncated: false,
       };
     }
-
-    const isNewThread = !conversationId;
-    const conversation =
-      conversationId ??
-      (await conversationRepository.create(repositoryId, fallbackTitle(question))).id;
 
     const userMessage = await messageRepository.create({
       conversationId: conversation,
@@ -301,7 +322,10 @@ export const conversationService = {
     // Name the thread properly, in the background. The fallback title is already
     // saved, so this only ever improves the sidebar — and it must not delay the
     // answer the reader is waiting on.
-    if (isNewThread) {
+    // "hi man" has no subject to name, and asking for one produced "The user
+    // said \"hi man\"" in the sidebar. What they typed is already the best label
+    // a greeting can have.
+    if (isNewThread && classifyQuestion(question) !== 'smalltalk') {
       void generateTitle(question)
         .then((title) =>
           title ? conversationRepository.rename(conversation, repositoryId, title) : undefined,

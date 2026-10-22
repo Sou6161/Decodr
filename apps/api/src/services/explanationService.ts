@@ -205,6 +205,15 @@ export function stripTextToolCalls(text: string): string {
 /** Callbacks a caller supplies to receive the answer incrementally. */
 export interface ExplainStreamHandlers {
   /**
+   * The thread this answer is being written into, as soon as it exists.
+   *
+   * Only fired for a NEW thread, and only by the conversation layer — the
+   * explanation itself knows nothing about conversations. It is what lets a
+   * reader who stops the very first answer stay in the thread that was saved,
+   * instead of having to find it in the sidebar.
+   */
+  onConversation?: (conversationId: string) => void;
+  /**
    * Fired once the kind of message is known, before any work that takes time.
    * Lets the reader show what is actually happening — saying "reading the
    * codebase" while answering "hi" is simply untrue.

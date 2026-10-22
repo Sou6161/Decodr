@@ -95,6 +95,9 @@ export const conversationController = {
         question,
         signal: controller.signal,
         stream: {
+          onConversation: (id) => {
+            if (!aborted) send('conversation', { id });
+          },
           onStart: (intent) => {
             if (!aborted) send('start', { intent });
           },
