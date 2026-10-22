@@ -1,5 +1,7 @@
 import type { Request, Response } from 'express';
 import type {
+  FileContentResponse,
+  ListFilesResponse,
   ListRepositoriesResponse,
   RepositoryDashboardResponse,
   RepositoryDetailResponse,
@@ -11,6 +13,7 @@ import { repositoryService } from '../services/repositoryService.js';
 import { uploadService } from '../services/uploadService.js';
 import { getRepositoryGraph } from '../services/graphService.js';
 import { getDashboard } from '../services/dashboardService.js';
+import { fileService } from '../services/fileService.js';
 import { AppError } from '../utils/AppError.js';
 
 /** Thin HTTP layer: parse input, call a service, shape the response. */
@@ -30,6 +33,20 @@ export const repositoryController = {
   async remove(req: Request, res: Response): Promise<void> {
     await repositoryService.remove(requireId(req));
     res.status(204).send();
+  },
+
+  /** Every scanned path. Feeds @-mention autocomplete in the composer. */
+  async files(req: Request, res: Response): Promise<void> {
+    const files = await fileService.listPaths(requireId(req));
+    const body: ListFilesResponse = { files };
+    res.json(body);
+  },
+
+  /** One file's source, so a cited path in an answer can be opened and checked. */
+  async fileContent(req: Request, res: Response): Promise<void> {
+    const path = typeof req.query.path === 'string' ? req.query.path : '';
+    const body: FileContentResponse = await fileService.getContent(requireId(req), path);
+    res.json(body);
   },
 
   async progress(req: Request, res: Response): Promise<void> {

@@ -1,7 +1,11 @@
 import type {
   AskResponse,
   ConversationResponse,
+  FileContentResponse,
   ListConversationsResponse,
+  ListFilesResponse,
+  ShareConversationResponse,
+  SharedConversationResponse,
 } from '@decodr/types';
 import { apiClient } from '@/services/apiClient';
 
@@ -18,11 +22,45 @@ export const explainApi = {
     apiClient.patch<void>(`/repositories/${repoId}/conversations/${cid}`, { title }),
   deleteConversation: (repoId: string, cid: string) =>
     apiClient.delete<void>(`/repositories/${repoId}/conversations/${cid}`),
+
+  /** Every path in the project, for @-mention autocomplete. */
+  listFiles: (repoId: string) =>
+    apiClient.get<ListFilesResponse>(`/repositories/${repoId}/files`),
+
+  /** One file's source, so a cited path can be opened and checked. */
+  getFile: (repoId: string, path: string) =>
+    apiClient.get<FileContentResponse>(
+      `/repositories/${repoId}/file?path=${encodeURIComponent(path)}`,
+    ),
+
+  rateMessage: (repoId: string, cid: string, mid: string, feedback: 1 | -1 | null, note?: string) =>
+    apiClient.patch<void>(
+      `/repositories/${repoId}/conversations/${cid}/messages/${mid}/feedback`,
+      { feedback, ...(note ? { note } : {}) },
+    ),
+
+  /** Deletes a message and everything after it, so an edit replaces the turn. */
+  rewindTo: (repoId: string, cid: string, mid: string) =>
+    apiClient.delete<void>(`/repositories/${repoId}/conversations/${cid}/messages/${mid}`),
+
+  share: (repoId: string, cid: string) =>
+    apiClient.post<ShareConversationResponse>(
+      `/repositories/${repoId}/conversations/${cid}/share`,
+      {},
+    ),
+  unshare: (repoId: string, cid: string) =>
+    apiClient.delete<ShareConversationResponse>(
+      `/repositories/${repoId}/conversations/${cid}/share`,
+    ),
+
+  /** Reads a shared transcript. No session; the token is the whole credential. */
+  getShared: (token: string) =>
+    apiClient.get<SharedConversationResponse>(`/shared/${encodeURIComponent(token)}`),
 };
 
 /** Events the streaming endpoint emits, in the order they arrive. */
 /** What kind of message the server decided this is. */
-export type AskIntent = 'smalltalk' | 'overview' | 'code';
+export type AskIntent = 'smalltalk' | 'general' | 'overview' | 'code';
 
 export interface AskStreamHandlers {
   /** Fired before any slow work, so the UI can describe it honestly. */
@@ -108,4 +146,10 @@ export const conversationKeys = {
   all: (repoId: string) => ['repositories', repoId, 'conversations'] as const,
   detail: (repoId: string, cid: string) =>
     ['repositories', repoId, 'conversations', cid] as const,
+};
+
+export const fileKeys = {
+  list: (repoId: string) => ['repositories', repoId, 'files'] as const,
+  content: (repoId: string, path: string) =>
+    ['repositories', repoId, 'file', path] as const,
 };

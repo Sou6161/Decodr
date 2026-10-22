@@ -4,6 +4,8 @@ import type {
   AskResponse,
   ConversationResponse,
   ListConversationsResponse,
+  ShareConversationResponse,
+  SharedConversationResponse,
 } from '@decodr/types';
 import { conversationService } from '../services/conversationService.js';
 import { AppError } from '../utils/AppError.js';
@@ -146,4 +148,59 @@ export const conversationController = {
     await conversationService.remove(requireParam(req, 'id'), requireParam(req, 'cid'));
     res.status(204).send();
   },
+
+  /** Rates an answer: useful, not useful, or back to unrated. */
+  async rate(req: Request, res: Response): Promise<void> {
+    const { feedback, note } = FeedbackBodySchema.parse(req.body);
+    await conversationService.rateMessage(
+      requireParam(req, 'id'),
+      requireParam(req, 'cid'),
+      requireParam(req, 'mid'),
+      feedback,
+      note?.trim() ? note.trim() : null,
+    );
+    res.status(204).send();
+  },
+
+  /**
+   * Rewinds the thread to just before a message, deleting it and everything
+   * after. What an edited question does before it is re-asked.
+   */
+  async rewind(req: Request, res: Response): Promise<void> {
+    await conversationService.rewindTo(
+      requireParam(req, 'id'),
+      requireParam(req, 'cid'),
+      requireParam(req, 'mid'),
+    );
+    res.status(204).send();
+  },
+
+  async share(req: Request, res: Response): Promise<void> {
+    const shareToken = await conversationService.share(
+      requireParam(req, 'id'),
+      requireParam(req, 'cid'),
+    );
+    const body: ShareConversationResponse = { shareToken };
+    res.status(201).json(body);
+  },
+
+  async unshare(req: Request, res: Response): Promise<void> {
+    await conversationService.unshare(requireParam(req, 'id'), requireParam(req, 'cid'));
+    const body: ShareConversationResponse = { shareToken: null };
+    res.json(body);
+  },
+
+  /** Reads a shared thread. The one conversation route with no session. */
+  async shared(req: Request, res: Response): Promise<void> {
+    const body: SharedConversationResponse = await conversationService.getShared(
+      requireParam(req, 'token'),
+    );
+    res.json(body);
+  },
 };
+
+const FeedbackBodySchema = z.object({
+  // null clears a rating, so a mis-click is undoable.
+  feedback: z.union([z.literal(1), z.literal(-1), z.null()]),
+  note: z.string().max(500).optional(),
+});

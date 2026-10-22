@@ -18,6 +18,12 @@ export interface Message {
   openedPaths: string[];
   /** Model that produced the message (assistant messages only). */
 
+  /** Follow-up questions the model proposed with this answer. */
+  followUps: string[];
+  /** True when the answer ran out of token budget and can be resumed. */
+  truncated: boolean;
+  /** Reader's rating: 1 useful, -1 not useful, null untouched. */
+  feedback: 1 | -1 | null;
   createdAt: ISODateString;
 }
 
@@ -27,6 +33,8 @@ export interface Conversation {
   repositoryId: Id;
   title: string;
   messageCount: number;
+  /** Set once the owner has minted a read-only share link for this thread. */
+  shareToken: string | null;
   createdAt: ISODateString;
   updatedAt: ISODateString;
 }

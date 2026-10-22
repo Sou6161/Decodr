@@ -11,24 +11,45 @@ export function ChatMessages({
   messages,
   onEdit,
   onRegenerate,
+  onOpenFile,
+  onRate,
+  onContinue,
 }: {
   messages: Message[];
-  /** Puts a past question back in the composer so it can be reworded and re-asked. */
-  onEdit?: (content: string) => void;
+  /**
+   * Rewinds the thread to this question and puts it back in the composer, so
+   * the new wording replaces the turn instead of being appended beneath it.
+   */
+  onEdit?: (message: Message) => void;
   /** Re-asks the question that produced the last answer. */
   onRegenerate?: (question: string) => void;
+  /** Opens a cited file beside the answer. */
+  onOpenFile?: (path: string, line?: number) => void;
+  onRate?: (messageId: string, feedback: 1 | -1 | null) => void;
+  /** Resumes an answer that ran out of token budget. */
+  onContinue?: () => void;
 }) {
+  const lastId = messages[messages.length - 1]?.id;
   return (
     <div className="space-y-6">
       {messages.map((message) =>
         message.role === MessageRole.User ? (
-          <UserBubble key={message.id} content={message.content} {...(onEdit ? { onEdit } : {})} />
+          <UserBubble
+            key={message.id}
+            content={message.content}
+            {...(onEdit ? { onEdit: () => onEdit(message) } : {})}
+          />
         ) : (
           <AssistantCard
             key={message.id}
             message={message}
-            {...(onRegenerate && message.id === messages[messages.length - 1]?.id
+            {...(onOpenFile ? { onOpenFile } : {})}
+            {...(onRate ? { onRate } : {})}
+            {...(onRegenerate && message.id === lastId
               ? { onRegenerate: () => onRegenerate(lastQuestionBefore(messages, message.id)) }
+              : {})}
+            {...(onContinue && message.id === lastId && message.truncated
+              ? { onContinue }
               : {})}
           />
         ),
@@ -52,12 +73,17 @@ function MessageActions({
   onEdit,
   onRegenerate,
   label,
+  feedback,
+  onRate,
 }: {
   content: string;
-  onEdit?: (content: string) => void;
+  onEdit?: () => void;
   onRegenerate?: () => void;
   /** Distinguishes the answer's action row from a question's. */
   label?: string;
+  /** Current rating, so the chosen thumb stays lit. */
+  feedback?: 1 | -1 | null;
+  onRate?: (feedback: 1 | -1 | null) => void;
 }) {
   const [copied, setCopied] = useState(false);
   const copy = async () => {
@@ -79,7 +105,7 @@ function MessageActions({
       )}
     >
       {onEdit && (
-        <button type="button" className={btn} onClick={() => onEdit(content)}>
+        <button type="button" className={btn} onClick={onEdit}>
           Edit
         </button>
       )}
@@ -90,6 +116,29 @@ function MessageActions({
         <button type="button" className={btn} onClick={onRegenerate}>
           Regenerate
         </button>
+      )}
+      {onRate && (
+        <>
+          {/* Clicking the lit thumb clears it, so a mis-click is undoable. */}
+          <button
+            type="button"
+            aria-label="This answer was useful"
+            aria-pressed={feedback === 1}
+            className={cn(btn, feedback === 1 && 'text-primary')}
+            onClick={() => onRate(feedback === 1 ? null : 1)}
+          >
+            ↑
+          </button>
+          <button
+            type="button"
+            aria-label="This answer was not useful"
+            aria-pressed={feedback === -1}
+            className={cn(btn, feedback === -1 && 'text-danger')}
+            onClick={() => onRate(feedback === -1 ? null : -1)}
+          >
+            ↓
+          </button>
+        </>
       )}
     </div>
   );
@@ -108,7 +157,7 @@ export function UserBubble({
   onEdit,
 }: {
   content: string;
-  onEdit?: (content: string) => void;
+  onEdit?: () => void;
 }) {
   return (
     <div className="group flex flex-col items-end">
@@ -127,9 +176,15 @@ export function UserBubble({
 function AssistantCard({
   message,
   onRegenerate,
+  onOpenFile,
+  onRate,
+  onContinue,
 }: {
   message: Message;
   onRegenerate?: () => void;
+  onOpenFile?: (path: string, line?: number) => void;
+  onRate?: (messageId: string, feedback: 1 | -1 | null) => void;
+  onContinue?: () => void;
 }) {
   const [expanded, setExpanded] = useState(false);
   // Files the model went and fetched mid-answer, highlighted so the difference
@@ -141,11 +196,31 @@ function AssistantCard({
 
   return (
     <Card className="group p-5">
-      <Markdown content={message.content} />
+      <Markdown content={message.content} {...(onOpenFile ? { onOpenFile } : {})} />
+
+      {/* An answer that ran out of budget used to end in a line of italics
+          telling the reader to ask it to continue. This is that, as a button. */}
+      {message.truncated && onContinue && (
+        <div className="mt-3 flex items-center gap-2 rounded-lg border border-border bg-surface-raised/50 px-3 py-2">
+          <p className="flex-1 text-[11px] text-subtle">
+            This answer hit its length limit and stopped here.
+          </p>
+          <button
+            type="button"
+            onClick={onContinue}
+            className="rounded-lg border border-border px-2.5 py-1 text-[11px] font-medium text-foreground transition-colors hover:border-border-strong"
+          >
+            Continue
+          </button>
+        </div>
+      )}
+
       <MessageActions
         content={message.content}
         label="answer"
+        feedback={message.feedback}
         {...(onRegenerate ? { onRegenerate } : {})}
+        {...(onRate ? { onRate: (f: 1 | -1 | null) => onRate(message.id, f) } : {})}
       />
       {total > 0 && (
         <div className="mt-4 border-t border-border pt-3">
@@ -159,19 +234,33 @@ function AssistantCard({
             )}
           </p>
           <div className="flex flex-wrap items-center gap-1.5">
-            {shown.map((path) => (
-              <Badge
-                key={path}
-                className={cn('font-mono', opened.has(path) && 'border-primary/40 text-primary')}
-                title={
-                  opened.has(path)
-                    ? 'Decodr opened this file while answering'
-                    : 'Selected before answering'
-                }
-              >
-                {path}
-              </Badge>
-            ))}
+            {shown.map((path) =>
+              onOpenFile ? (
+                <button key={path} type="button" onClick={() => onOpenFile(path)}>
+                  <Badge
+                    className={cn(
+                      'cursor-pointer font-mono transition-colors hover:border-primary/60 hover:text-primary',
+                      opened.has(path) && 'border-primary/40 text-primary',
+                    )}
+                    title={`Open ${path}`}
+                  >
+                    {path}
+                  </Badge>
+                </button>
+              ) : (
+                <Badge
+                  key={path}
+                  className={cn('font-mono', opened.has(path) && 'border-primary/40 text-primary')}
+                  title={
+                    opened.has(path)
+                      ? 'Decodr opened this file while answering'
+                      : 'Selected before answering'
+                  }
+                >
+                  {path}
+                </Badge>
+              ),
+            )}
             {total > CONTEXT_PREVIEW && (
               <button
                 type="button"

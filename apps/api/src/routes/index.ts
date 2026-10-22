@@ -2,6 +2,7 @@ import { Router } from 'express';
 import { healthController } from '../controllers/healthController.js';
 import { asyncHandler } from '../middleware/errorHandler.js';
 import { repositoryRouter } from './repository.routes.js';
+import { conversationController } from '../controllers/conversationController.js';
 
 /** Root API router mounted at /api. */
 export const apiRouter: Router = Router();
@@ -14,3 +15,9 @@ apiRouter.get('/ping', (_req, res) => {
 
 apiRouter.get('/health', asyncHandler(healthController));
 apiRouter.use('/repositories', repositoryRouter);
+
+// The one conversation route with no session behind it: a shared transcript,
+// reachable by whoever holds the link. It exposes the messages and the
+// project's name, nothing else — not the project id, not its files, not the
+// owner's other threads. The general limiter still applies through the app.
+apiRouter.get('/shared/:token', asyncHandler(conversationController.shared));

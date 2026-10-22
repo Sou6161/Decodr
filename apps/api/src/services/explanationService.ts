@@ -3,14 +3,17 @@ import { getAIProvider } from '../ai/providerFactory.js';
 import {
   buildExplanationContext,
   CONTEXT_LIMITS,
+  MAP_ONLY_LIMITS,
 } from '../ai/contextBuilder.js';
 import {
   buildChatMessages,
+  buildGeneralMessages,
   buildMessages,
   type HistoryTurn,
   type RepositoryFacts,
 } from '../ai/promptBuilder.js';
 import { classifyQuestion, type QuestionIntent } from '../ai/intent.js';
+import { extractMentions, mightReferenceFiles, type Mentions } from '../ai/mentions.js';
 import { READ_FILES_TOOL, runReadFiles } from '../ai/fileReader.js';
 import {
   FIND_USAGES_TOOL,
@@ -24,16 +27,18 @@ import type { ChatMessage } from '../ai/types.js';
 import { logger } from '../utils/logger.js';
 import { repositoryRepository } from '../repositories/repositoryRepository.js';
 import { componentRepository } from '../repositories/componentRepository.js';
+import { fileRepository } from '../repositories/fileRepository.js';
 import { AppError } from '../utils/AppError.js';
 
 /**
- * Answers an architecture question about a repository. Builds a focused context
- * (only the relevant files), then asks the configured AI provider — the whole
- * repository is never sent to the model.
+ * Answers a message about a repository.
  *
- * Detailed mode goes all-out: far more context files, less truncation, and a
- * much larger answer budget, so nothing important gets skipped. Quick mode stays
- * lean and fast.
+ * Four paths, chosen by what was actually sent. Small talk gets a one-line
+ * reply off a handful of project facts. A general programming question is
+ * answered from knowledge. Anything about this project's code gets a focused
+ * context — only the relevant files, never the whole repository — and the
+ * model can open more as it goes. Depth is the model's call, taken from the
+ * question itself rather than from a mode the reader had to pick in advance.
  */
 export async function explainRepository(
   repositoryId: string,
@@ -45,6 +50,8 @@ export async function explainRepository(
     stream?: ExplainStreamHandlers;
     /** Cancels the in-flight model call when the reader stops the answer. */
     signal?: AbortSignal;
+    /** Titles of the reader's other threads on this project, for continuity. */
+    relatedThreads?: string[];
   } = {},
 ): Promise<ExplainResponse> {
   const trimmed = question.trim();
@@ -64,7 +71,16 @@ export async function explainRepository(
   const limits = CONTEXT_LIMITS;
 
   const history = opts.history ?? [];
-  const intent = classifyQuestion(trimmed);
+
+  // Mentions are resolved before the intent is announced, because naming a file
+  // settles what kind of message this is: `@src/App.tsx why does this rerender`
+  // is a question about their code however its wording scores.
+  const mentions: Mentions = mightReferenceFiles(trimmed)
+    ? extractMentions(trimmed, (await fileRepository.listPaths(repositoryId)).map((f) => f.path))
+    : { paths: [], isError: false };
+
+  const intent =
+    mentions.paths.length > 0 || mentions.isError ? 'code' : classifyQuestion(trimmed);
   opts.stream?.onStart(intent);
 
   // Greetings and "what can you do" are not code questions. Sending them through
@@ -98,7 +114,17 @@ export async function explainRepository(
       model: result.model,
       contextPaths: [],
       openedPaths: [],
+      truncated: false,
     };
+  }
+
+  // "What is the difference between useMemo and useCallback", "write me a
+  // debounce hook", "how do I structure a form" — programming questions that
+  // name nothing in this project. These used to be forced down the retrieval
+  // path, which attached whichever files scored highest on the keywords and
+  // then answered about them.
+  if (intent === 'general') {
+    return answerFromKnowledge(repositoryId, provider, trimmed, history, opts);
   }
 
   // Retrieval query, not the prompt. A follow-up like "why?" or "show me that"
@@ -113,11 +139,20 @@ export async function explainRepository(
     trimmed,
   ].join(' ');
 
-  const context = await buildExplanationContext(repositoryId, retrievalQuery, limits);
+  const context = await buildExplanationContext(
+    repositoryId,
+    retrievalQuery,
+    limits,
+    mentions.paths,
+  );
+  // Retrieval found nothing to attach. That used to be a hard error telling the
+  // reader to go and name a component — but a question is not invalid just
+  // because keyword matching missed it. Answer it from knowledge instead; the
+  // map and the code tools go along, so if it really is about their code the
+  // model can still find it.
   if (context.files.length === 0) {
-    throw AppError.unprocessable(
-      "Couldn't find code relevant to that question. Try naming a component, or ask about routing.",
-    );
+    logger.info('Explain: retrieval matched nothing; answering from knowledge');
+    return answerFromKnowledge(repositoryId, provider, trimmed, history, opts, context.repoMap);
   }
 
   opts.stream?.onContext(context.files.map((f) => f.path));
@@ -125,6 +160,9 @@ export async function explainRepository(
   const messages: ChatMessage[] = buildMessages(context, trimmed, {
     history,
     summary: opts.summary ?? null,
+    mentionedPaths: mentions.paths,
+    isError: mentions.isError,
+    relatedThreads: opts.relatedThreads ?? [],
   });
 
   // Files the model has already been shown — both the ones retrieval chose and
@@ -135,120 +173,16 @@ export async function explainRepository(
   // Headroom for on-demand reads, on top of what retrieval already spent.
   let readBudget = READ_BUDGET_CHARS;
 
-  const run = (req: Parameters<typeof provider.complete>[0]) => {
-    const withSignal = opts.signal ? { ...req, signal: opts.signal } : req;
-    return opts.stream
-      ? provider.stream(withSignal, {
-          onDelta: opts.stream.onDelta,
-          // A model swap mid-answer discards what was shown, same as a tool round.
-          onRestart: opts.stream.onReset,
-        })
-      : provider.complete(withSignal);
-  };
-
-  let result = await run({
+  return runAnswerLoop({
+    repositoryId,
+    provider,
     messages,
-    temperature: 0.4,
-    maxTokens: ANSWER_TOKENS,
-    tools: TOOLS,
+    seen,
+    opened,
+    readBudget,
+    ...(opts.stream ? { stream: opts.stream } : {}),
+    ...(opts.signal ? { signal: opts.signal } : {}),
   });
-
-  // Let the model pull in what it decides it needs. Bounded so a confused model
-  // cannot loop forever, and so cost per question stays predictable.
-  for (let round = 0; round < MAX_TOOL_ROUNDS && result.toolCalls?.length; round += 1) {
-    messages.push({
-      role: 'assistant',
-      content: result.text ?? '',
-      toolCalls: result.toolCalls,
-    });
-
-    const roundPaths: string[] = [];
-    for (const call of result.toolCalls) {
-      const read = await runTool(repositoryId, call.name, call.args, seen, readBudget);
-      opened.push(...read.paths);
-      roundPaths.push(...read.paths);
-      readBudget -= read.text.length;
-      messages.push({ role: 'tool', content: read.text, toolCallId: call.id });
-    }
-
-    logger.info(
-      `Explain: tool round ${round + 1}, ${seen.size} file(s) in context, ` +
-        `${Math.max(readBudget, 0)} chars of read budget left`,
-    );
-
-    if (roundPaths.length > 0) opts.stream?.onFiles(roundPaths);
-    // Anything streamed before the tool call is not part of the final answer.
-    opts.stream?.onReset();
-
-    const canReadMore = round < MAX_TOOL_ROUNDS - 1 && readBudget > 0;
-    if (!canReadMore) {
-      // Removing the tool silently made the model emit the call as plain text —
-      // it still wanted to read, and with no tool available it wrote out
-      // "<tool_call>..." into the answer. Tell it the budget is spent instead.
-      messages.push({
-        role: 'system',
-        content:
-          'No further file reads are available. Answer the question now using the files you ' +
-          'already have. If something is missing, say which file you would need and why — ' +
-          'do not write out a tool call.',
-      });
-    }
-
-    result = await run({
-      messages,
-      temperature: 0.4,
-      maxTokens: ANSWER_TOKENS,
-      ...(canReadMore ? { tools: TOOLS } : {}),
-    });
-  }
-
-  // A model that runs out of budget stops mid-sentence. Ask it to carry on from
-  // where it stopped rather than saving a severed answer — the reader did not
-  // choose the token limit and should not see it.
-  let full = result.text;
-  for (let i = 0; i < MAX_CONTINUATIONS && result.finishReason === 'length'; i += 1) {
-    messages.push({ role: 'assistant', content: result.text });
-    messages.push({
-      role: 'user',
-      content:
-        'That was cut off mid-sentence. Continue from exactly where you stopped. ' +
-        'Do not repeat anything, do not re-introduce the topic, do not start a new ' +
-        'heading unless the previous one genuinely ended — just carry straight on.',
-    });
-    logger.info(`Answer hit the token limit; continuing (${i + 1}/${MAX_CONTINUATIONS})`);
-    result = await run({
-      messages,
-      temperature: 0.4,
-      maxTokens: ANSWER_TOKENS,
-    });
-    // Join without a space: the model resumes mid-sentence.
-    full += result.text;
-  }
-
-  // Still truncated after the allowed continuations: say so rather than leaving
-  // a sentence severed and letting the reader think the model simply trailed off.
-  if (result.finishReason === 'length') {
-    full = `${full.trimEnd()}\n\n_(This answer was cut short. Ask a narrower question, or ask me to continue from here.)_`;
-  }
-
-  const answer = stripTextToolCalls(full).trim();
-  // A model that spends its last round on tool calls, or returns nothing, would
-  // otherwise be persisted as a blank message the reader cannot act on.
-  if (answer.length === 0) {
-    throw new AppError(
-      502,
-      'AI_EMPTY_RESPONSE',
-      'The model did not produce an answer. Try rephrasing the question.',
-    );
-  }
-
-  return {
-    answer,
-    provider: provider.name,
-    model: result.model,
-    contextPaths: [...seen],
-    openedPaths: opened,
-  };
 }
 
 /**
@@ -375,5 +309,205 @@ async function loadRepositoryFacts(repositoryId: string): Promise<RepositoryFact
     routeCount: repo.routeCount,
     topComponents,
     areas,
+  };
+}
+
+/**
+ * Answers without a retrieved file set: from the model's own knowledge, with
+ * the project map and the code tools available so it can ground the answer or
+ * go and look if the question turns out to be about their code.
+ */
+async function answerFromKnowledge(
+  repositoryId: string,
+  provider: Provider,
+  question: string,
+  history: HistoryTurn[],
+  opts: { summary?: string | null; stream?: ExplainStreamHandlers; signal?: AbortSignal },
+  repoMap?: string,
+): Promise<ExplainResponse> {
+  const [facts, map] = await Promise.all([
+    loadRepositoryFacts(repositoryId),
+    // Reuse the caller's map when it already built one, rather than paying for
+    // the same queries twice on the retrieval-missed path.
+    repoMap !== undefined
+      ? Promise.resolve(repoMap)
+      : buildExplanationContext(repositoryId, question, MAP_ONLY_LIMITS).then((c) => c.repoMap),
+  ]);
+
+  // Nothing is attached yet, so there are no files to report — but the reader
+  // still gets told the moment the model opens one.
+  opts.stream?.onContext([]);
+
+  const messages = buildGeneralMessages(facts, map, question, {
+    history,
+    summary: opts.summary ?? null,
+  });
+
+  return runAnswerLoop({
+    repositoryId,
+    provider,
+    messages,
+    seen: new Set<string>(),
+    opened: [],
+    readBudget: READ_BUDGET_CHARS,
+    ...(opts.stream ? { stream: opts.stream } : {}),
+    ...(opts.signal ? { signal: opts.signal } : {}),
+  });
+}
+
+/** The configured provider, whichever one the factory hands back. */
+type Provider = ReturnType<typeof getAIProvider>;
+
+/**
+ * Runs a prepared conversation to a finished answer.
+ *
+ * Shared by every path that can end up needing the codebase: the model may stop
+ * to read files, and may have to be resumed if it hits the token ceiling
+ * mid-sentence. Both the retrieval path and the general-knowledge path go
+ * through here, so a general question that turns out to be about this project
+ * can still go and look rather than guessing.
+ */
+async function runAnswerLoop(args: {
+  repositoryId: string;
+  provider: Provider;
+  messages: ChatMessage[];
+  /** Files already in the prompt, so the model is never handed the same source twice. */
+  seen: Set<string>;
+  /** Files the model opened itself, reported to the reader. */
+  opened: string[];
+  readBudget: number;
+  stream?: ExplainStreamHandlers;
+  signal?: AbortSignal;
+}): Promise<ExplainResponse> {
+  const { repositoryId, provider, messages, seen, opened } = args;
+  let readBudget = args.readBudget;
+  const opts = { stream: args.stream, signal: args.signal };
+
+  const run = (req: Parameters<Provider['complete']>[0]) => {
+    const withSignal = opts.signal ? { ...req, signal: opts.signal } : req;
+    return opts.stream
+      ? provider.stream(withSignal, {
+          onDelta: opts.stream.onDelta,
+          // A model swap mid-answer discards what was shown, same as a tool round.
+          onRestart: opts.stream.onReset,
+        })
+      : provider.complete(withSignal);
+  };
+
+  let result = await run({
+    messages,
+    temperature: 0.4,
+    maxTokens: ANSWER_TOKENS,
+    tools: TOOLS,
+  });
+
+  // Let the model pull in what it decides it needs. Bounded so a confused model
+  // cannot loop forever, and so cost per question stays predictable.
+  for (let round = 0; round < MAX_TOOL_ROUNDS && result.toolCalls?.length; round += 1) {
+    messages.push({
+      role: 'assistant',
+      content: result.text ?? '',
+      toolCalls: result.toolCalls,
+    });
+
+    // One round often asks for several things at once — three file reads plus a
+    // search. Awaiting them in sequence made each round as slow as the sum of
+    // its parts for no reason: they are independent lookups against Postgres.
+    //
+    // The budget is split evenly rather than consumed in order, because
+    // "whatever is left" is not knowable until the others have finished. The
+    // cost is that one large file can be clipped while a sibling call leaves
+    // room unused; the saving is a round that takes as long as its slowest part.
+    const share = Math.floor(readBudget / result.toolCalls.length);
+    const reads = await Promise.all(
+      result.toolCalls.map((call) => runTool(repositoryId, call.name, call.args, seen, share)),
+    );
+
+    const roundPaths: string[] = [];
+    result.toolCalls.forEach((call, i) => {
+      const read = reads[i]!;
+      opened.push(...read.paths);
+      roundPaths.push(...read.paths);
+      readBudget -= read.text.length;
+      messages.push({ role: 'tool', content: read.text, toolCallId: call.id });
+    });
+
+    logger.info(
+      `Explain: tool round ${round + 1}, ${seen.size} file(s) in context, ` +
+        `${Math.max(readBudget, 0)} chars of read budget left`,
+    );
+
+    if (roundPaths.length > 0) opts.stream?.onFiles(roundPaths);
+    // Anything streamed before the tool call is not part of the final answer.
+    opts.stream?.onReset();
+
+    const canReadMore = round < MAX_TOOL_ROUNDS - 1 && readBudget > 0;
+    if (!canReadMore) {
+      // Removing the tool silently made the model emit the call as plain text —
+      // it still wanted to read, and with no tool available it wrote out
+      // "<tool_call>..." into the answer. Tell it the budget is spent instead.
+      messages.push({
+        role: 'system',
+        content:
+          'No further file reads are available. Answer the question now using the files you ' +
+          'already have. If something is missing, say which file you would need and why — ' +
+          'do not write out a tool call.',
+      });
+    }
+
+    result = await run({
+      messages,
+      temperature: 0.4,
+      maxTokens: ANSWER_TOKENS,
+      ...(canReadMore ? { tools: TOOLS } : {}),
+    });
+  }
+
+  // A model that runs out of budget stops mid-sentence. Ask it to carry on from
+  // where it stopped rather than saving a severed answer — the reader did not
+  // choose the token limit and should not see it.
+  let full = result.text;
+  for (let i = 0; i < MAX_CONTINUATIONS && result.finishReason === 'length'; i += 1) {
+    messages.push({ role: 'assistant', content: result.text });
+    messages.push({
+      role: 'user',
+      content:
+        'That was cut off mid-sentence. Continue from exactly where you stopped. ' +
+        'Do not repeat anything, do not re-introduce the topic, do not start a new ' +
+        'heading unless the previous one genuinely ended — just carry straight on.',
+    });
+    logger.info(`Answer hit the token limit; continuing (${i + 1}/${MAX_CONTINUATIONS})`);
+    result = await run({
+      messages,
+      temperature: 0.4,
+      maxTokens: ANSWER_TOKENS,
+    });
+    // Join without a space: the model resumes mid-sentence.
+    full += result.text;
+  }
+
+  // Still truncated after the allowed continuations. This used to append a line
+  // of italics telling the reader to ask it to continue — a dead end dressed as
+  // a hint. It is a flag now, and the thread offers a button that resumes it.
+  const truncated = result.finishReason === 'length';
+
+  const answer = stripTextToolCalls(full).trim();
+  // A model that spends its last round on tool calls, or returns nothing, would
+  // otherwise be persisted as a blank message the reader cannot act on.
+  if (answer.length === 0) {
+    throw new AppError(
+      502,
+      'AI_EMPTY_RESPONSE',
+      'The model did not produce an answer. Try rephrasing the question.',
+    );
+  }
+
+  return {
+    answer,
+    provider: provider.name,
+    model: result.model,
+    contextPaths: [...seen],
+    openedPaths: opened,
+    truncated,
   };
 }

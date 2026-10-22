@@ -26,6 +26,26 @@ export const fileRepository = {
     });
   },
 
+  /** One file's stored source, for the in-app viewer. */
+  findByPath(
+    repositoryId: string,
+    path: string,
+  ): Promise<{ path: string; content: string | null; lineCount: number } | null> {
+    return prisma.file.findFirst({
+      where: { repositoryId, path },
+      select: { path: true, content: true, lineCount: true },
+    });
+  },
+
+  /** Every path in the repository, for @-mention autocomplete and the viewer. */
+  listPaths(repositoryId: string): Promise<{ path: string; lineCount: number }[]> {
+    return prisma.file.findMany({
+      where: { repositoryId },
+      select: { path: true, lineCount: true },
+      orderBy: { path: 'asc' },
+    });
+  },
+
   deleteByRepository(repositoryId: string): Promise<Prisma.BatchPayload> {
     return prisma.file.deleteMany({ where: { repositoryId } });
   },

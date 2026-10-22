@@ -20,6 +20,9 @@ export function toMessageDto(model: MessageModel): Message {
     // The model name is kept in the database for debugging but deliberately not
     // sent to the browser — which provider answers is not the reader's concern,
     // and shipping it means it shows up in devtools whatever the UI renders.
+    followUps: model.followUps,
+    truncated: model.truncated,
+    feedback: model.feedback === 1 || model.feedback === -1 ? model.feedback : null,
     createdAt: model.createdAt.toISOString(),
   };
 }
@@ -30,6 +33,7 @@ export function toConversationDto(model: ConversationWithCount): Conversation {
     repositoryId: model.repositoryId,
     title: model.title,
     messageCount: model._count.messages,
+    shareToken: model.shareToken,
     createdAt: model.createdAt.toISOString(),
     updatedAt: model.updatedAt.toISOString(),
   };
@@ -43,6 +47,7 @@ export function toConversationWithMessagesDto(
     repositoryId: model.repositoryId,
     title: model.title,
     messageCount: model.messages.length,
+    shareToken: model.shareToken,
     createdAt: model.createdAt.toISOString(),
     updatedAt: model.updatedAt.toISOString(),
     messages: model.messages.map(toMessageDto),

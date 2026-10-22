@@ -55,4 +55,6 @@ export interface ExplainResponse {
   contextPaths: string[];
   /** Files the model opened itself via the read_files tool. */
   openedPaths: string[];
+  /** True when the answer ran out of token budget and can be resumed. */
+  truncated: boolean;
 }

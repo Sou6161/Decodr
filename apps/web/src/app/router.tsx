@@ -8,6 +8,7 @@ import { UploadPage } from '@/pages/UploadPage';
 import { DashboardPage } from '@/pages/repository/DashboardPage';
 import { ExplainPage } from '@/pages/repository/ExplainPage';
 import { NotFoundPage } from '@/pages/NotFoundPage';
+import { SharedConversationPage } from '@/pages/SharedConversationPage';
 
 // Code-split the graph view — React Flow + dagre are heavy and only needed here.
 const GraphPage = lazy(() =>
@@ -16,6 +17,9 @@ const GraphPage = lazy(() =>
 
 export const router = createBrowserRouter([
   { path: '/', element: <LandingPage /> },
+  // Outside the app shell on purpose: a shared transcript has no session, no
+  // sidebar and no project to navigate into.
+  { path: '/shared/:token', element: <SharedConversationPage /> },
   {
     element: <AppShell />,
     children: [

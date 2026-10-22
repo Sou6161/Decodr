@@ -124,10 +124,27 @@ function scoreFile(filePath: string, keywords: string[]): number {
  * file plus graph neighbors), and truncates everything to a token budget. The
  * whole repository is never included.
  */
+/**
+ * Budget for callers that need only the project map — no file contents. Used by
+ * the general-knowledge path, which wants to know what exists without paying to
+ * read any of it.
+ */
+export const MAP_ONLY_LIMITS: ContextLimits = {
+  maxFiles: 0,
+  maxFileChars: 0,
+  maxTotalChars: 0,
+};
+
 export async function buildExplanationContext(
   repositoryId: string,
   question: string,
   limits: ContextLimits = CONTEXT_LIMITS,
+  /**
+   * Files the reader named with `@`, or that a pasted error points at. These
+   * bypass keyword scoring entirely — an explicit mention is the reader
+   * correcting retrieval, so it must not have to compete for a slot.
+   */
+  pinned: string[] = [],
 ): Promise<ExplanationContext> {
   const { maxFiles, maxFileChars, maxTotalChars } = limits;
   const repo = await repositoryRepository.findById(repositoryId);
@@ -162,6 +179,10 @@ export async function buildExplanationContext(
         .slice(0, 4)
     : [];
 
+  // A mentioned file is the subject, whatever the keywords say. Kept separate
+  // from `manifestPaths` so it sorts ahead of them too.
+  const pinnedPaths = pinned.filter((p) => fileById.size === 0 || allFiles.some((f) => f.path === p));
+
   // Rank components and files by how well they match the question keywords.
   const scoredComponents = components
     .map((c) => ({ c, score: scoreComponent(c, keywords) }))
@@ -180,7 +201,29 @@ export async function buildExplanationContext(
   let relatedComponents: string[] = [];
   let orderedPaths: string[] = [];
 
-  if (keywords.length > 0 && (focus || scoredFiles.length > 0 || manifestPaths.length > 0)) {
+  if (pinnedPaths.length > 0) {
+    // Explicit mention: those files, plus their graph neighbours if there is
+    // room, and nothing that merely scored well on keywords.
+    const byPath = new Map(components.map((c) => [c.file.path, c]));
+    const mentioned = pinnedPaths.map((p) => byPath.get(p)).filter((c): c is ComponentWithPath => Boolean(c));
+    focusName = mentioned[0]?.name ?? pinnedPaths[0]!.split('/').pop() ?? null;
+
+    const neighbourPaths: string[] = [];
+    const byId = new Map(components.map((c) => [c.id, c]));
+    for (const c of mentioned) {
+      for (const e of edges) {
+        if (e.sourceId === c.id) {
+          const t = byId.get(e.targetId);
+          if (t) neighbourPaths.push(t.file.path);
+        } else if (e.targetId === c.id) {
+          const src = byId.get(e.sourceId);
+          if (src) neighbourPaths.push(src.file.path);
+        }
+      }
+    }
+    relatedComponents = unique(mentioned.map((c) => c.name));
+    orderedPaths = unique([...pinnedPaths, ...neighbourPaths, ...manifestPaths]);
+  } else if (keywords.length > 0 && (focus || scoredFiles.length > 0 || manifestPaths.length > 0)) {
     // Keyword-driven: the feature the user named (by component name or folder).
     focusName = focus?.name ?? capitalize(keywords[0]!);
 

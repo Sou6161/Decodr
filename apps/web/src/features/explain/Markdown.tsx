@@ -1,17 +1,47 @@
-import { Fragment, useState, type ReactNode } from 'react';
+import { createContext, Fragment, useContext, useState, type ReactNode } from 'react';
 
 /**
  * Minimal, dependency-free markdown renderer for the subset the explanation
  * persona uses: paragraphs, headings, bullet/numbered lists, fenced code
  * blocks, inline `code`, and **bold**. Built by hand — no markdown library.
+ *
+ * With `onOpenFile`, inline code that reads like a file path becomes a button
+ * that opens that file. An answer cites paths constantly and they used to be
+ * inert text, which made every citation something the reader had to take on
+ * trust or go and check by hand in their editor.
  */
-export function Markdown({ content }: { content: string }) {
+export function Markdown({
+  content,
+  onOpenFile,
+}: {
+  content: string;
+  onOpenFile?: (path: string, line?: number) => void;
+}) {
   // Spacing is set per block rather than with a uniform gap: a heading needs
   // room above it and little below, so it binds to the text it introduces.
   return (
-    <div className="text-[14.5px] leading-7 text-foreground/90">{renderBlocks(content)}</div>
+    <FileLinkContext.Provider value={onOpenFile ?? null}>
+      <div className="text-[14.5px] leading-7 text-foreground/90">{renderBlocks(content)}</div>
+    </FileLinkContext.Provider>
   );
 }
+
+/**
+ * Passed through context rather than down every render helper. The block and
+ * inline renderers are plain module functions several levels deep, and
+ * threading a callback through all of them to reach one branch of
+ * `renderInline` would be the only reason any of them took props.
+ */
+const FileLinkContext = createContext<((path: string, line?: number) => void) | null>(null);
+
+/**
+ * Inline code that is a file reference: `src/App.tsx`, `src/App.tsx:42`,
+ * `package.json`. Requires a real-looking extension so that `useState` or
+ * `node.id` is never mistaken for a path — a false positive here renders a
+ * button that opens nothing, which is worse than plain text.
+ */
+const FILE_CITATION =
+  /^([\w.-]+(?:\/[\w.-]+)*\.(?:tsx?|jsx?|mjs|cjs|json|css|scss|md|html|ya?ml|prisma|sql))(?::(\d+))?(?::\d+)?$/;
 
 /** True for a markdown table's |---|:--:| separator row. */
 function isTableSeparator(line: string | undefined): boolean {
@@ -273,14 +303,7 @@ function renderInline(text: string): ReactNode[] {
     if (match.index > last) parts.push(<Fragment key={key++}>{text.slice(last, match.index)}</Fragment>);
     const token = match[0];
     if (token.startsWith('`')) {
-      parts.push(
-        <code
-          key={key++}
-          className="rounded bg-surface-raised px-1 py-0.5 font-mono text-[0.8em] text-accent"
-        >
-          {token.slice(1, -1)}
-        </code>,
-      );
+      parts.push(<InlineCode key={key++} text={token.slice(1, -1)} />);
     } else if (token.startsWith('~~')) {
       parts.push(
         <s key={key++} className="text-subtle">
@@ -325,4 +348,32 @@ function renderInline(text: string): ReactNode[] {
   }
   if (last < text.length) parts.push(<Fragment key={key++}>{text.slice(last)}</Fragment>);
   return parts;
+}
+
+/**
+ * Inline code, as a button when it names a file the viewer can open.
+ *
+ * A component rather than a branch in `renderInline` because reading the
+ * context is a hook, and `renderInline` is a loop that runs a variable number
+ * of times per call.
+ */
+function InlineCode({ text }: { text: string }) {
+  const onOpenFile = useContext(FileLinkContext);
+  const match = onOpenFile ? FILE_CITATION.exec(text.trim()) : null;
+  const className = 'rounded bg-surface-raised px-1 py-0.5 font-mono text-[0.8em] text-accent';
+
+  if (!match) return <code className={className}>{text}</code>;
+
+  const path = match[1]!;
+  const line = match[2] ? Number(match[2]) : undefined;
+  return (
+    <button
+      type="button"
+      onClick={() => onOpenFile!(path, line)}
+      title={`Open ${path}${line ? ` at line ${line}` : ''}`}
+      className={`${className} cursor-pointer underline decoration-dotted decoration-from-font underline-offset-2 transition-colors hover:bg-primary/15 hover:text-primary`}
+    >
+      {text}
+    </button>
+  );
 }

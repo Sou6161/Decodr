@@ -21,6 +21,8 @@ repositoryRouter.get('/:id', owned, asyncHandler(repositoryController.detail));
 repositoryRouter.delete('/:id', owned, asyncHandler(repositoryController.remove));
 repositoryRouter.get('/:id/progress', owned, asyncHandler(repositoryController.progress));
 repositoryRouter.get('/:id/components', owned, asyncHandler(repositoryController.entities));
+repositoryRouter.get('/:id/files', owned, asyncHandler(repositoryController.files));
+repositoryRouter.get('/:id/file', owned, asyncHandler(repositoryController.fileContent));
 repositoryRouter.get('/:id/graph', owned, asyncHandler(repositoryController.graph));
 repositoryRouter.get('/:id/dashboard', owned, asyncHandler(repositoryController.dashboard));
 
@@ -36,3 +38,21 @@ repositoryRouter.post(
 repositoryRouter.get('/:id/conversations/:cid', owned, asyncHandler(conversationController.detail));
 repositoryRouter.patch('/:id/conversations/:cid', owned, asyncHandler(conversationController.rename));
 repositoryRouter.delete('/:id/conversations/:cid', owned, asyncHandler(conversationController.remove));
+repositoryRouter.patch(
+  '/:id/conversations/:cid/messages/:mid/feedback',
+  owned,
+  asyncHandler(conversationController.rate),
+);
+// Deletes this message and every later one: what an edited question does before
+// it is re-asked, so the new wording replaces the old turn.
+repositoryRouter.delete(
+  '/:id/conversations/:cid/messages/:mid',
+  owned,
+  asyncHandler(conversationController.rewind),
+);
+repositoryRouter.post('/:id/conversations/:cid/share', owned, asyncHandler(conversationController.share));
+repositoryRouter.delete(
+  '/:id/conversations/:cid/share',
+  owned,
+  asyncHandler(conversationController.unshare),
+);

@@ -192,6 +192,59 @@ const MAP_NOTE =
   'Never describe or quote the contents of a file you have not actually read — open it instead.';
 
 
+/**
+ * Keeps an instruction about *how* to answer alive across turns.
+ *
+ * Without this, "explain it like an interview answer" or "keep it short" held
+ * for exactly one reply and then the default shape came back, which reads as
+ * the assistant forgetting what it was told two messages ago.
+ */
+const STYLE_MEMORY_NOTE =
+  'If they have told you HOW they want answers in this conversation — shorter, simpler, like an interview answer, no code, more code, a particular format — that instruction still stands. Keep following it until they change it, and let it override the default shape below.';
+
+/**
+ * Shown when the reader named files with `@`. Without it the model treats a
+ * mentioned file as just another attachment and may still answer about whichever
+ * one it finds most interesting.
+ */
+function mentionNote(paths: string[]): string {
+  return (
+    `The reader explicitly named ${paths.length === 1 ? 'this file' : 'these files'}: ${paths.join(', ')}. ` +
+    'That is the subject of the question — answer about it, not about whatever else is attached. ' +
+    'The other files are there for context only. If the question cannot be answered from the named ' +
+    'files alone, open what you need, but keep the answer about what they pointed at.'
+  );
+}
+
+/**
+ * Shown when the message looks like a pasted error rather than a question.
+ *
+ * People paste a stack trace with no question attached and expect the obvious
+ * thing: tell me what broke and how to fix it. Answering an error paste with a
+ * general architecture walkthrough is useless.
+ */
+const ERROR_NOTE =
+  'This message is a pasted error or stack trace. They want it diagnosed, not explained in general. ' +
+  'Lead with the most likely cause in one or two sentences, pointing at the specific line or call that produces it. ' +
+  'Then give the fix as concretely as you can — the actual change, in code, in the real file. ' +
+  'Any files the trace names are attached below; open anything else you need to confirm the cause rather than guessing between possibilities. ' +
+  'If the trace genuinely does not identify the cause, say which file or which value you would need to see.';
+
+/**
+ * Other threads the reader has open on this project.
+ *
+ * Titles only, and only so the model can say "we went through the upload flow
+ * in another thread" instead of starting from zero. Replaying those
+ * conversations would be noise and cost; knowing they exist is nearly free.
+ */
+function relatedThreadsNote(titles: string[]): string {
+  return (
+    `They have also asked about this project in other chats: ${titles.join('; ')}. ` +
+    'Mention one only if it is directly relevant to what they just asked — you do not have those ' +
+    'conversations, only their titles, so never claim to know what was said in them.'
+  );
+}
+
 const FOLLOWUP_NOTE =
   'This is a follow-up in an ongoing conversation — the earlier turns are above. Resolve pronouns and shorthand ("it", "that function", "why?") against what was already discussed, and do not re-explain ground you already covered; build on it. The files attached below are freshly selected for THIS question, so they may differ from the earlier ones.';
 
@@ -262,6 +315,70 @@ function trimHistory(history: HistoryTurn[]): ChatMessage[] {
 }
 
 /**
+ * Persona for questions about programming in general rather than about this
+ * repository — concepts, comparisons, "how do I", "write me a hook".
+ *
+ * These used to go down the code path, where the prompt forbids writing any
+ * code that is not quoted from an attached file and retrieval had attached
+ * whichever files scored highest on the keywords. Asking "what is the
+ * difference between useMemo and useCallback" got back a walkthrough of an
+ * unrelated component. A developer assistant has to be able to just answer.
+ */
+export const GENERAL_SYSTEM_PROMPT = `You are Decodr, a senior engineer talking with a developer in a chat. They have a React/TypeScript project open, but THIS question is a general one — about a concept, a comparison, a how-to, or code they want written.
+
+Answer it properly, the way a good engineer would answer a colleague who asked them at their desk.
+
+- Answer from your own knowledge. You are NOT restricted to their project here, and you may write fresh code — your own examples, not quotes from their files. Write idiomatic, modern, correct code.
+- Lead with the answer. If they asked which of two things to use, say which, then why. If they asked for code, give the code and then the short explanation of it. Never open with a restatement of the question or a paragraph of preamble.
+- Say what you would actually do, and why. Where there is a real trade-off, name it in a sentence; where there is a clear default, recommend it instead of listing every option neutrally.
+- Keep it as long as the question deserves and no longer. A sharp factual question gets a couple of sentences. "Explain X" or "how do I build Y" gets a proper explanation with code. Padding, recaps and "I hope this helps" are worse than being brief.
+- Correctness over confidence. If something depends on a version or a detail you do not have, say so in a clause and answer for the common case rather than hedging the whole reply.
+
+You also have this project's file map and its code tools. Use them when — and only when — the question turns out to be about their code after all, or when grounding the answer in what they actually have makes it genuinely more useful ("you already use React Query here, so…"). Do not tour their project unasked, and never describe a file you have not opened.
+
+No AI filler, no "As an AI", no restating the question. Markdown is fine: short headings when there is real structure, fenced code blocks with a language tag for code, prose everywhere else.`;
+
+/**
+ * Builds a general-knowledge reply. The project map and facts ride along so the
+ * model can ground the answer, or go and look, if the question turns out to be
+ * about their code after all.
+ */
+export function buildGeneralMessages(
+  facts: RepositoryFacts,
+  repoMap: string,
+  question: string,
+  opts: { history?: HistoryTurn[]; summary?: string | null } = {},
+): ChatMessage[] {
+  const userContent = [
+    `Their project, for context only — do not describe it unless the question calls for it: ${facts.name}, ` +
+      `${facts.fileCount} files, ${facts.componentCount} components` +
+      (facts.areas.length > 0 ? `, organised under ${facts.areas.join(', ')}` : '') +
+      '.',
+    repoMap,
+    MAP_NOTE,
+    STYLE_MEMORY_NOTE,
+    `Question: ${question.trim()}`,
+  ]
+    .filter(Boolean)
+    .join('\n\n');
+
+  const summary = opts.summary?.trim();
+  return [
+    { role: 'system', content: GENERAL_SYSTEM_PROMPT },
+    ...(summary
+      ? [
+          {
+            role: 'system' as const,
+            content: `Earlier in this conversation (summarized):\n${summary}`,
+          },
+        ]
+      : []),
+    ...trimHistory(opts.history ?? []),
+    { role: 'user', content: userContent },
+  ];
+}
+
+/**
  * Assembles the chat messages: persona + prior turns + focused context + the
  * question. Replaying history is what makes follow-ups ("why?", "show me that
  * part") resolve against what was already said.
@@ -272,6 +389,12 @@ export function buildMessages(
   opts: {
     history?: HistoryTurn[];
     summary?: string | null;
+    /** Files the reader named with `@`, which outrank everything else attached. */
+    mentionedPaths?: string[];
+    /** True when the message is a pasted error rather than a question. */
+    isError?: boolean;
+    /** Titles of the reader's other threads on this project. */
+    relatedThreads?: string[];
   } = {},
 ): ChatMessage[] {
   const header: string[] = [];
@@ -287,12 +410,19 @@ export function buildMessages(
     })
     .join('\n\n');
 
+  const mentioned = opts.mentionedPaths ?? [];
   const userContent = [
+    opts.isError ? ERROR_NOTE : '',
+    mentioned.length > 0 ? mentionNote(mentioned) : '',
     LENGTH_NOTE,
-    context.guessed ? GUESSED_NOTE : '',
+    STYLE_MEMORY_NOTE,
+    // A mention or a trace already says what the question is about, so the
+    // "nothing matched, these are guesses" warning would be a lie.
+    context.guessed && mentioned.length === 0 ? GUESSED_NOTE : '',
     context.repoMap,
     MAP_NOTE,
     (opts.history?.length ?? 0) > 0 ? FOLLOWUP_NOTE : '',
+    (opts.relatedThreads?.length ?? 0) > 0 ? relatedThreadsNote(opts.relatedThreads!) : '',
     header.join('\n'),
     'Relevant files from the repository:',
     fileBlocks,

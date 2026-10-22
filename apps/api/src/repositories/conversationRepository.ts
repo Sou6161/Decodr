@@ -52,6 +52,28 @@ export const conversationRepository = {
     return prisma.conversation.updateMany({ where: { id, repositoryId }, data: { title } });
   },
 
+  /** Sets or clears the read-only share token, scoped to its repository. */
+  setShareToken(id: string, repositoryId: string, shareToken: string | null) {
+    return prisma.conversation.updateMany({ where: { id, repositoryId }, data: { shareToken } });
+  },
+
+  /**
+   * Looks a conversation up by its share token alone.
+   *
+   * The only path into a conversation that does not go through the owner's
+   * session, so it is deliberately narrow: an exact token match, and the
+   * repository name comes along only to label the page.
+   */
+  findByShareToken(shareToken: string) {
+    return prisma.conversation.findFirst({
+      where: { shareToken },
+      include: {
+        messages: { orderBy: { createdAt: 'asc' } },
+        repository: { select: { name: true } },
+      },
+    });
+  },
+
   /** Persists the rolling summary and how many messages it now covers. */
   saveSummary(id: string, summary: string, summarizedCount: number): Promise<unknown> {
     return prisma.conversation.update({

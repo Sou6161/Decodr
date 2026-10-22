@@ -46,4 +46,42 @@ describe('classifyQuestion', () => {
       expect(classifyQuestion(q), q).toBe('code');
     }
   });
+
+  it('routes general programming questions to general', () => {
+    for (const q of [
+      'what is the difference between useMemo and useCallback',
+      'useState vs useReducer',
+      'how do i debounce an input',
+      'write me a custom hook for fetching',
+      'best practices for error boundaries',
+      'should i use context or redux',
+      'what are the trade-offs of server components',
+      'give me an example of a generic type',
+      'is tailwind better than css modules',
+      'explain react server components',
+      'write a regex for emails',
+      'what is a monorepo',
+    ]) {
+      expect(classifyQuestion(q), q).toBe('general');
+    }
+  });
+
+  it('keeps project-anchored questions on the code path', () => {
+    // These all match a general-knowledge pattern too, so they are exactly the
+    // cases where the general path would wrongly swallow a real code question.
+    for (const q of [
+      'how do i add a new route in this project',
+      'what is the difference between the two layouts here',
+      'where is the ProfileImage component',
+      'how does our auth middleware work',
+      'write me a test for apps/web/src/utils/cn.ts',
+      'which file holds the rate limiter',
+      'how do i use the useDashboard hook',
+      // A named technology plus anything anchoring it to this repo stays code.
+      'should i use zustand or redux here',
+      'how do i deploy this to render',
+    ]) {
+      expect(classifyQuestion(q), q).toBe('code');
+    }
+  });
 });

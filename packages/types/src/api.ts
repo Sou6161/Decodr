@@ -68,6 +68,38 @@ export interface AskRequest {
   question: string;
 }
 
+/** GET /api/repositories/:id/files → every scanned path, for mentions and the viewer. */
+export interface ListFilesResponse {
+  files: { path: string; lineCount: number }[];
+}
+
+/** GET /api/repositories/:id/file?path=… → one file's source. */
+export interface FileContentResponse {
+  path: string;
+  content: string;
+  lineCount: number;
+  /** True when the stored copy was capped and this is only the start of the file. */
+  truncated: boolean;
+}
+
+/** PATCH …/messages/:mid/feedback → rate an answer. */
+export interface MessageFeedbackRequest {
+  feedback: 1 | -1 | null;
+  note?: string;
+}
+
+/** POST/DELETE …/conversations/:cid/share → mint or revoke a read-only link. */
+export interface ShareConversationResponse {
+  shareToken: string | null;
+}
+
+/** GET /api/shared/:token → a read-only view of a shared conversation. */
+export interface SharedConversationResponse {
+  title: string;
+  repositoryName: string;
+  messages: Message[];
+}
+
 /** Result of asking: the (possibly new) conversation plus the two new messages. */
 export interface AskResponse {
   conversation: Conversation;

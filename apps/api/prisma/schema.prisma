@@ -157,6 +157,10 @@ model Conversation {
   /// incrementally instead of regenerated from scratch on every turn.
   summarizedCount Int @default(0)
 
+  /// Opt-in read-only share token. Null — the default for every conversation —
+  /// means private: reachable only through the owner's session.
+  shareToken String? @unique
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -178,6 +182,20 @@ model Message {
   openedPaths  String[] @default([])
   /// The model that produced an assistant message.
   model String?
+
+  /// Reader feedback on an assistant message: 1 for useful, -1 for not, null
+  /// for untouched. There was no signal at all about which answers land.
+  feedback     Int?
+  /// Optional free text explaining a thumbs-down.
+  feedbackNote String?
+
+  /// Follow-up questions the model proposed with this answer. Persisted so the
+  /// chips survive a reload, like the rest of the thread.
+  followUps String[] @default([])
+
+  /// Set when the answer ran out of token budget. The thread offers to resume
+  /// it rather than printing a note telling the reader to ask.
+  truncated Boolean @default(false)
 
   createdAt DateTime @default(now())
 
