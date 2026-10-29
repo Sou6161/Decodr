@@ -1,4 +1,4 @@
-import OpenAI from 'openai';
+import OpenAI, { APIUserAbortError } from 'openai';
 import { AIProviderName } from '@decodr/types';
 import type {
   AIProvider,
@@ -72,10 +72,28 @@ export function worthRetryingElsewhere(status: number | undefined, err: unknown)
   }
 
   // A connection failure, unless the caller aborted on purpose.
-  if (status === undefined) {
-    return !(err instanceof Error && err.name === 'AbortError');
-  }
+  if (status === undefined) return !isAbort(err);
   return false;
+}
+
+/**
+ * Whether an error is the caller stopping the request on purpose.
+ *
+ * Checking `name === 'AbortError'` alone was not enough: the OpenAI SDK throws
+ * its own `APIUserAbortError`, whose name is plain "Error". A reader pressing
+ * Stop was therefore classified as a connection failure and retried on the next
+ * model in the chain — stopping an answer could walk every fallback in turn.
+ */
+export function isAbort(err: unknown): boolean {
+  return (
+    err instanceof APIUserAbortError ||
+    (err instanceof Error && err.name === 'AbortError')
+  );
+}
+
+/** The error a stopped request rejects with, so every caller sees one shape. */
+export function abortError(): Error {
+  return Object.assign(new Error('The request was stopped.'), { name: 'AbortError' });
 }
 
 interface RawToolCall {
@@ -183,6 +201,9 @@ export class OpenAIProvider implements AIProvider {
         }
         return result;
       } catch (err) {
+        // A stop is not a failure: no other model should be tried, and it must
+        // not be dressed up as an "AI request failed" error and logged as one.
+        if (isAbort(err)) throw abortError();
         lastError = err;
         const status = err instanceof OpenAI.APIError ? err.status : undefined;
         const isLast = index === this.chain.length - 1;
@@ -280,6 +301,13 @@ export class OpenAIProvider implements AIProvider {
       // and some providers never send one. Requiring it meant the model asked
       // to read a file, the request was silently discarded, and the answer came
       // back built on whatever it had already guessed.
+      // The SDK ends the iteration QUIETLY when the request is aborted, instead
+      // of throwing. Returned as-is, a stopped answer was indistinguishable from
+      // a finished one: it was saved without its "stopped" marker, as though the
+      // model had chosen to end there, and a title and follow-ups were then
+      // generated for the fragment. Stopping is not finishing; say so.
+      if (request.signal?.aborted) throw abortError();
+
       const toolCalls: ToolCall[] = [...partial.entries()]
         .filter(([, c]) => c.name)
         .map(([index, c]) => ({ ...c, id: c.id || `call_${index}` }));

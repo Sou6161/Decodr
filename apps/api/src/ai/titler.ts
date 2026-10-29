@@ -1,5 +1,6 @@
 import { getAIProvider } from './providerFactory.js';
 import { logger } from '../utils/logger.js';
+import { finalLineInstruction, finalLines } from './finalAnswer.js';
 
 /**
  * Names a conversation.
@@ -13,7 +14,12 @@ import { logger } from '../utils/logger.js';
 
 /** A title is a label, not a sentence; this is a hard ceiling. */
 const TITLE_MAX_CHARS = 48;
-const TITLE_MAX_TOKENS = 24;
+/**
+ * Room for the model to think before it answers. This was 24 — enough for a
+ * four-word title and nothing else, so a model that reasons first was cut off
+ * mid-sentence on every single request. See finalAnswer.ts.
+ */
+const TITLE_MAX_TOKENS = 400;
 
 const TITLE_SYSTEM = `You name a chat thread. Given the user's opening message, reply with a title of 2 to 5 words and nothing else.
 
@@ -24,7 +30,7 @@ Rules:
 - Use the real component, file or concept name when the message names one.
 - Sentence case, not Title Case.
 
-Reply with the title only.`;
+Reply with the title only.` + finalLineInstruction('the title');
 
 /**
  * Titles that describe the message instead of naming its subject.
@@ -88,7 +94,10 @@ export async function generateTitle(question: string): Promise<string | null> {
       maxTokens: TITLE_MAX_TOKENS,
     });
 
-    const title = clean(result.text);
+    // Prefer the marked line. A model that skips the marker and answers
+    // directly is still read from its first line, as before.
+    const marked = finalLines(result.text).at(-1);
+    const title = clean(marked ?? result.text);
     return isUsableTitle(title) ? title : null;
   } catch (err) {
     logger.warn(`Chat title skipped: ${err instanceof Error ? err.message : err}`);

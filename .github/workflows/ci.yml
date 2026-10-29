@@ -24,3 +24,6 @@ jobs:
       - run: npm run db:generate
       - run: npm run typecheck
       - run: npm test
+      # Typecheck does not run the bundler. A Vite build can still fail — an
+      # unresolved import, a bad env reference — and that is what Vercel runs.
+      - run: npm run build

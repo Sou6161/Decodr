@@ -1,4 +1,5 @@
 import type { ErrorRequestHandler, RequestHandler } from 'express';
+import { track } from '../utils/inflight.js';
 import { ZodError } from 'zod';
 import type { ApiError } from '@decodr/types';
 import { AppError } from '../utils/AppError.js';
@@ -10,7 +11,9 @@ export function asyncHandler<
   T extends RequestHandler,
 >(handler: T): RequestHandler {
   return (req, res, next) => {
-    Promise.resolve(handler(req, res, next)).catch(next);
+    // Tracked so a deploy waits for the handler to finish rather than cutting
+    // it off — see utils/inflight.ts.
+    track(Promise.resolve(handler(req, res, next))).catch(next);
   };
 }
 

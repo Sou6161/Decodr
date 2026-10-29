@@ -1,5 +1,6 @@
 import { getAIProvider } from './providerFactory.js';
 import { logger } from '../utils/logger.js';
+import { finalLineInstruction, finalLines } from './finalAnswer.js';
 
 /**
  * Next questions to offer after an answer.
@@ -16,7 +17,12 @@ import { logger } from '../utils/logger.js';
  */
 
 const MAX_FOLLOWUPS = 3;
-const FOLLOWUP_MAX_TOKENS = 120;
+/**
+ * Room to think before answering. At 120 a model that reasons first spent the
+ * whole budget narrating and was cut off at "1. Where", so a general question
+ * reliably got no suggestions at all. See finalAnswer.ts.
+ */
+const FOLLOWUP_MAX_TOKENS = 600;
 /** A chip has to fit on one line next to two others. */
 const FOLLOWUP_MAX_CHARS = 60;
 /** How much of the answer the suggestions are drawn from. */
@@ -31,7 +37,8 @@ Rules:
 - Write them as the developer would type them: short, direct, first person. "Where is that cached?" not "Could you elaborate on the caching strategy?"
 - Name the real thing — the component, file or concept the answer actually mentioned.
 - Under 60 characters each. No numbering, no bullets, no quotes, no trailing explanation.
-- If the answer was small talk, or genuinely leaves nothing worth asking next, reply with nothing at all.`;
+- If the answer was small talk, or genuinely leaves nothing worth asking next, give no FINAL lines at all.` +
+  finalLineInstruction('the follow-up questions', { many: true });
 
 /** Strips numbering, bullets and quoting that models add anyway. */
 function clean(line: string): string {
@@ -71,8 +78,10 @@ export async function generateFollowUps(
       maxTokens: FOLLOWUP_MAX_TOKENS,
     });
 
-    return result.text
-      .split('\n')
+    // Marked lines when the model used them; otherwise every line, which is what
+    // a model that answers directly without reasoning produces.
+    const marked = finalLines(result.text);
+    return (marked.length > 0 ? marked : result.text.split('\n'))
       .map(clean)
       // A line with no question in it is usually the model narrating ("Here are
       // three follow-ups:"), which is not something to offer as a chip.

@@ -29,8 +29,14 @@ export function useConversation(repoId: string, conversationId: string | null) {
  * that start only once the answer has been sent. One read at 1.5s covered a
  * fast model and missed a slow one, whose chips then only appeared on the next
  * navigation — so it checks again, backing off, and stops once they are in.
+ *
+ * Measured against production on the free model chain: follow-ups landed 6.5s
+ * after the answer, with the first token of the answer itself taking 12s. A
+ * model that falls back to the next in the chain is slower again, so the last
+ * check is well past what a healthy primary needs. Checks after everything has
+ * arrived are skipped, so the long tail costs nothing in the common case.
  */
-const BACKGROUND_SETTLE_MS = [1500, 4000, 9000];
+const BACKGROUND_SETTLE_MS = [2000, 5000, 9000, 15000, 25000];
 
 /**
  * Asks a question. On success it writes the two new messages straight into the
@@ -84,7 +90,7 @@ export function useAsk(repoId: string) {
         },
       }, abortRef.current.signal);
     },
-    onSuccess: ({ conversation, userMessage, assistantMessage }) => {
+    onSuccess: ({ conversation, userMessage, assistantMessage }, vars) => {
       queryClient.setQueryData<ConversationWithMessages>(
         conversationKeys.detail(repoId, conversation.id),
         (old) => ({
@@ -101,14 +107,23 @@ export function useAsk(repoId: string) {
       // Both the generated title (on the list) and the generated follow-ups (on
       // the answer, in the detail query) land shortly after the answer itself.
       const detailKey = conversationKeys.detail(repoId, conversation.id);
-      const settled = () =>
-        queryClient
-          .getQueryData<ConversationWithMessages>(detailKey)
-          ?.messages.find((m) => m.id === assistantMessage.id)?.followUps.length;
+      // The title and the follow-ups are two INDEPENDENT background calls that
+      // finish in either order. Stopping as soon as the chips arrived left a new
+      // thread's sidebar stuck on its placeholder title whenever the title was
+      // the slower of the two.
+      const isNewThread = !vars.conversationId;
+      const placeholderTitle = conversation.title;
+      const settled = () => {
+        const detail = queryClient.getQueryData<ConversationWithMessages>(detailKey);
+        const haveFollowUps = Boolean(
+          detail?.messages.find((m) => m.id === assistantMessage.id)?.followUps.length,
+        );
+        const haveTitle = !isNewThread || (detail?.title ?? placeholderTitle) !== placeholderTitle;
+        return haveFollowUps && haveTitle;
+      };
       for (const delay of BACKGROUND_SETTLE_MS) {
         window.setTimeout(() => {
-          // Follow-ups and the title are written together; once the chips are
-          // in, later checks would only re-read what is already on screen.
+          // Once both are in, later checks would only re-read what is on screen.
           if (settled()) return;
           void queryClient.invalidateQueries({ queryKey: conversationKeys.all(repoId) });
           void queryClient.invalidateQueries({ queryKey: detailKey });

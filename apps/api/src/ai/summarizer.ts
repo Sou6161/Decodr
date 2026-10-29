@@ -1,6 +1,7 @@
 import { getAIProvider } from './providerFactory.js';
 import { MAX_HISTORY_TURNS, type HistoryTurn } from './promptBuilder.js';
 import { logger } from '../utils/logger.js';
+import { afterFinalMarker, finalLineInstruction } from './finalAnswer.js';
 
 /**
  * Rolling conversation summary.
@@ -12,8 +13,11 @@ import { logger } from '../utils/logger.js';
 
 /** Summarize only once this many turns have dropped out of the window. */
 const SUMMARIZE_BATCH = 4;
-/** The summary is a memo, not an essay — this is a hard ceiling. */
-const SUMMARY_MAX_TOKENS = 320;
+/**
+ * Room to think, plus the memo. The memo itself stays under SUMMARY_MAX_CHARS;
+ * the budget is larger so a model that reasons first can still finish.
+ */
+const SUMMARY_MAX_TOKENS = 1000;
 const SUMMARY_MAX_CHARS = 1800;
 /** Past answers are clipped hard before summarizing; the opening carries the point. */
 const SOURCE_ANSWER_CHARS = 900;
@@ -23,7 +27,9 @@ const SUMMARY_SYSTEM = `You compress a technical conversation about a codebase i
 Keep: what the user asked about, which components/files/areas were covered, the conclusions reached, and any preference they stated (e.g. "wants more code examples", "cares about the upload flow").
 Drop: code snippets, restatements of the question, pleasantries, and anything the attached source files would already show.
 
-Write compact prose or terse bullets. No headings, no preamble, no code blocks. Under 150 words.`;
+Write compact prose or terse bullets. No headings, no preamble, no code blocks. Under 150 words.` +
+  finalLineInstruction('the memo') +
+  '\nThe memo may continue onto the lines after FINAL:.';
 
 export interface SummaryState {
   summary: string | null;
@@ -74,7 +80,14 @@ export async function maybeExtendSummary(
       maxTokens: SUMMARY_MAX_TOKENS,
     });
 
-    const text = result.text.trim();
+    // The summary is replayed into every later prompt as "earlier in this
+    // conversation", so reasoning text leaking into it would quietly corrupt
+    // the thread's memory rather than fail visibly. With no marker, trust the
+    // reply only if the model finished; a cut-off reply is most likely a
+    // half-written chain of thought.
+    const marked = afterFinalMarker(result.text);
+    if (!marked && result.finishReason === 'length') return null;
+    const text = (marked ?? result.text).trim();
     if (!text) return null;
 
     return {
