@@ -24,12 +24,13 @@ export function useConversation(repoId: string, conversationId: string | null) {
 }
 
 /**
- * How long to wait before re-reading a thread for the things the server
- * generates after the answer: its title and its follow-up suggestions. Both are
- * short completions that start only once the answer has been sent, so a second
- * and a half covers them without the refetch reading as a flicker.
+ * When to re-read a thread for the things the server generates after the
+ * answer: its title and its follow-up suggestions. Both are short completions
+ * that start only once the answer has been sent. One read at 1.5s covered a
+ * fast model and missed a slow one, whose chips then only appeared on the next
+ * navigation — so it checks again, backing off, and stops once they are in.
  */
-const BACKGROUND_SETTLE_MS = 1500;
+const BACKGROUND_SETTLE_MS = [1500, 4000, 9000];
 
 /**
  * Asks a question. On success it writes the two new messages straight into the
@@ -99,12 +100,20 @@ export function useAsk(repoId: string) {
       // opening clause until the next navigation.
       // Both the generated title (on the list) and the generated follow-ups (on
       // the answer, in the detail query) land shortly after the answer itself.
-      window.setTimeout(() => {
-        void queryClient.invalidateQueries({ queryKey: conversationKeys.all(repoId) });
-        void queryClient.invalidateQueries({
-          queryKey: conversationKeys.detail(repoId, conversation.id),
-        });
-      }, BACKGROUND_SETTLE_MS);
+      const detailKey = conversationKeys.detail(repoId, conversation.id);
+      const settled = () =>
+        queryClient
+          .getQueryData<ConversationWithMessages>(detailKey)
+          ?.messages.find((m) => m.id === assistantMessage.id)?.followUps.length;
+      for (const delay of BACKGROUND_SETTLE_MS) {
+        window.setTimeout(() => {
+          // Follow-ups and the title are written together; once the chips are
+          // in, later checks would only re-read what is already on screen.
+          if (settled()) return;
+          void queryClient.invalidateQueries({ queryKey: conversationKeys.all(repoId) });
+          void queryClient.invalidateQueries({ queryKey: detailKey });
+        }, delay);
+      }
       // The persisted message now renders from cache; drop the partial copy.
       setStreamed('');
       setOpenedFiles([]);

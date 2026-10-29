@@ -38,7 +38,19 @@ export function isHookName(name: string): boolean {
   return /^use[A-Z0-9]/.test(name);
 }
 
-/** True if the subtree contains any JSX. */
+/**
+ * `React.createElement(...)` / `createElement(...)` — the call JSX compiles to.
+ * Components written without JSX syntax (older code, some libraries) render
+ * this way, and were not recognised as components at all.
+ */
+function isCreateElementCall(n: ts.Node): n is ts.CallExpression {
+  if (!ts.isCallExpression(n)) return false;
+  const callee = n.expression;
+  if (ts.isIdentifier(callee)) return callee.text === 'createElement';
+  return ts.isPropertyAccessExpression(callee) && callee.name.text === 'createElement';
+}
+
+/** True if the subtree renders anything: JSX, or a createElement call. */
 export function containsJsx(node: ts.Node): boolean {
   let found = false;
   const visit = (n: ts.Node): void => {
@@ -46,7 +58,8 @@ export function containsJsx(node: ts.Node): boolean {
     if (
       ts.isJsxElement(n) ||
       ts.isJsxSelfClosingElement(n) ||
-      ts.isJsxFragment(n)
+      ts.isJsxFragment(n) ||
+      isCreateElementCall(n)
     ) {
       found = true;
       return;
@@ -58,7 +71,7 @@ export function containsJsx(node: ts.Node): boolean {
 }
 
 /** Leftmost identifier of a JSX tag name (`Motion.div` → `Motion`). */
-function rootTagIdentifier(tagName: ts.JsxTagNameExpression): string | null {
+export function rootTagIdentifier(tagName: ts.JsxTagNameExpression): string | null {
   if (ts.isIdentifier(tagName)) return tagName.text;
   if (ts.isPropertyAccessExpression(tagName)) {
     let expr: ts.Expression = tagName;
@@ -69,8 +82,23 @@ function rootTagIdentifier(tagName: ts.JsxTagNameExpression): string | null {
 }
 
 /**
- * Collects PascalCase JSX tag names rendered within a subtree — these are the
+ * The tag as written when it is `Namespace.Member` (`UI.Button`), else null.
+ * Kept whole so the graph can follow `import * as UI from './ui'` to the
+ * file that declares `Button`.
+ */
+function memberTag(tagName: ts.JsxTagNameExpression): string | null {
+  if (!ts.isPropertyAccessExpression(tagName) || !ts.isIdentifier(tagName.expression)) return null;
+  return `${tagName.expression.text}.${tagName.name.text}`;
+}
+
+/**
+ * Collects the component tags rendered within a subtree — these are the
  * components this component renders (its outgoing graph edges).
+ *
+ * `Header` and `Motion.div` contribute their PascalCase root; `UI.Button`
+ * also contributes the full member form, because a lowercase or PascalCase
+ * namespace import is resolved through its member, not its root. The first
+ * argument of `createElement(Header, …)` counts as a rendered tag too.
  */
 export function collectRenderedTags(node: ts.Node): string[] {
   const tags = new Set<string>();
@@ -78,6 +106,11 @@ export function collectRenderedTags(node: ts.Node): string[] {
     if (ts.isJsxOpeningElement(n) || ts.isJsxSelfClosingElement(n)) {
       const name = rootTagIdentifier(n.tagName);
       if (name && isComponentName(name)) tags.add(name);
+      const member = memberTag(n.tagName);
+      if (member && isComponentName(member.split('.')[1]!)) tags.add(member);
+    } else if (isCreateElementCall(n)) {
+      const first = n.arguments[0];
+      if (first && ts.isIdentifier(first) && isComponentName(first.text)) tags.add(first.text);
     }
     ts.forEachChild(n, visit);
   };

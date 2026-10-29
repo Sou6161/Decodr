@@ -18,6 +18,20 @@ export interface ParsedImport {
   names: ParsedImportName[];
 }
 
+/**
+ * A re-export: `export { Button } from './Button'`, `export { default as Card }
+ * from './Card'`, or `export * from './ui'`. Barrel files are made of these,
+ * and without following them an import through `components/index.ts` led to a
+ * file that declares nothing and so produced no edge.
+ */
+export interface ParsedReExport {
+  /** Name this file exports it under; '*' for `export * from`. */
+  exported: string;
+  /** Name in the source module ('default' for a re-exported default, '*' for star). */
+  imported: string;
+  resolvedPath: string | null;
+}
+
 /** A React component discovered in a file. */
 export interface ParsedComponent {
   name: string;
@@ -26,7 +40,10 @@ export interface ParsedComponent {
   isDefaultExport: boolean;
   startLine: number;
   endLine: number;
-  /** PascalCase JSX tag names rendered inside this component's body. */
+  /**
+   * Component tags rendered inside this component's body: `Header`, or
+   * `UI.Button` for a member of a namespace import.
+   */
   renderedTags: string[];
 }
 
@@ -52,5 +69,6 @@ export interface ParsedFile {
   components: ParsedComponent[];
   hooks: ParsedHook[];
   imports: ParsedImport[];
+  reExports: ParsedReExport[];
   routes: ParsedRoute[];
 }

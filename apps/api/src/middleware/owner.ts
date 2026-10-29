@@ -1,12 +1,18 @@
 import { randomBytes } from 'node:crypto';
 import type { RequestHandler } from 'express';
-import { isProd } from '../config/env.js';
+import { env, isProd } from '../config/env.js';
 import { AppError } from '../utils/AppError.js';
 import { repositoryRepository } from '../repositories/repositoryRepository.js';
 
 const COOKIE = 'decodr_sid';
 const TOKEN_RE = /^[a-f0-9]{64}$/;
 const MAX_AGE_MS = 1000 * 60 * 60 * 24 * 90; // 90 days
+
+/**
+ * Lax whenever the cookie can be first-party: always in local dev, and in
+ * production once COOKIE_DOMAIN puts web and API on the same site.
+ */
+const cookieSameSite: 'lax' | 'none' = !isProd || env.COOKIE_DOMAIN ? 'lax' : 'none';
 
 /**
  * Per-visitor isolation. On first request we mint an unguessable 256-bit token
@@ -22,12 +28,16 @@ export const attachOwner: RequestHandler = (req, res, next) => {
     token = randomBytes(32).toString('hex');
     res.cookie(COOKIE, token, {
       httpOnly: true,
-      // Cross-site in production (Vercel ↔ Render) needs SameSite=None + Secure;
-      // Lax is fine for same-origin local dev.
-      sameSite: isProd ? 'none' : 'lax',
+      // With the API on another site (Vercel ↔ onrender.com) the cookie is a
+      // third-party cookie and needs SameSite=None + Secure — which Safari and
+      // strict privacy settings may still block. Serving the API from the
+      // web app's own site (api.example.com beside app.example.com) and setting
+      // COOKIE_DOMAIN makes it first-party, so Lax works and nothing blocks it.
+      sameSite: cookieSameSite,
       secure: isProd,
       maxAge: MAX_AGE_MS,
       path: '/',
+      ...(env.COOKIE_DOMAIN ? { domain: env.COOKIE_DOMAIN } : {}),
     });
   }
 

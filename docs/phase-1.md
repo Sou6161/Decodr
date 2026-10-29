@@ -1,5 +1,7 @@
 # Phase 1 — Foundation
 
+> Historical build log from when the project was called Arcloom. It describes each phase as it shipped; for how the code works today see [interview-guide.md](interview-guide.md).
+
 Project setup, application architecture, database, and base UI.
 
 ## What was built

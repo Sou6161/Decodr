@@ -26,9 +26,14 @@ const SOURCE_EXT = /\.(tsx?|jsx?|mjs|cjs)$/i;
 /**
  * Manifests answer "what does this project use?" — dependencies, scripts, env
  * keys. Only the `.example` env variants, never a real `.env`, so nobody's
- * secrets leave the browser.
+ * secrets leave the browser. tsconfig/jsconfig files ride along so the server
+ * can resolve `@/…` path aliases.
+ *
+ * Must match the server's upload filter exactly: the server pairs files with
+ * this manifest by index, so a file it rejects makes the whole upload fail.
  */
-const MANIFEST_RE = /(^|\/)(package\.json|\.env\.example|\.env\.sample)$/i;
+const MANIFEST_RE =
+  /(^|\/)(package\.json|\.env\.example|\.env\.sample|tsconfig(\.[\w-]+)?\.json|jsconfig\.json)$/i;
 const MAX_FILE_BYTES = 2 * 1024 * 1024; // skip minified/generated blobs
 const MAX_FILES = 8000;
 

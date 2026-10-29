@@ -39,7 +39,7 @@ export function userFacingMessage(status: number | undefined, detail: string): s
     return 'The explanation service is rate limited right now. Please wait a moment and try again.';
   }
   if (status === 402 || text.includes('credit') || text.includes('quota') || text.includes('billing')) {
-    return 'The explanation service is unavailable right now. Try Quick mode, or try again later.';
+    return 'The explanation service is unavailable right now. Please try again later.';
   }
   if (status === 401 || status === 403) {
     return 'Explanations are not configured correctly. This needs fixing on the server.';

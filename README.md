@@ -13,12 +13,14 @@ Decodr is a codebase-analysis platform for React + TypeScript projects. Pick a p
 ## Features (MVP)
 
 1. **Folder upload** — pick a project folder; the browser walks it, skips `node_modules` and build output, and uploads only source files and manifests. ZIP upload is also supported.
-2. **Static parser** — the TypeScript Compiler API extracts components, imports/exports, custom hooks, and file-based routes (Expo Router, Next App Router, Next Pages Router). Syntax-only, so a project parses without installing its dependencies.
+2. **Static parser** — the TypeScript Compiler API extracts components, imports/exports, custom hooks, React Router routes (nested ones joined to full URLs) and file-based routes (Expo Router, Next App Router, Next Pages Router). Imports resolve through tsconfig/jsconfig `paths` (`@/…`), NodeNext-style `.js` specifiers, barrel re-exports, namespace imports and `lazy()`/`require`. Syntax-only, so a project parses without installing its dependencies.
 3. **Component graph** — dependency graph persisted in PostgreSQL and visualised with React Flow.
-4. **Dashboard** — files, components, hooks, routes, largest and most-imported components, folder structure.
-5. **Feature map** — one card per feature area, components sized by line count.
-6. **Explain** — ask about the code and get an answer grounded in real source, in Quick or Detailed mode, with conversation memory across turns.
+4. **Dashboard** — files, components, hooks, routes, largest and most-imported components, folder tree.
+5. **Code map** — the biggest and most depended-on components as two bar charts, each bar a link into Explain.
+6. **Explain** — ask about the code and get a streamed answer grounded in real source, with conversation memory, `@file` mentions, pasted-error diagnosis, clickable citations, and tools the model uses to open and search files itself. Answers match the depth the question asks for.
 7. **Session isolation** — no login. Each visitor gets a 256-bit token in an httpOnly cookie and only ever sees their own uploads, which are deleted automatically after 48 hours.
+
+A full walkthrough of how every part works, with interview-style Q&A, is in [docs/interview-guide.md](docs/interview-guide.md).
 
 ---
 
@@ -133,11 +135,11 @@ const outgoing = edges.filter((e) => e.sourceId === focus.id);
 const incoming = edges.filter((e) => e.targetId === focus.id);
 ```
 
-Those files are sent in full — 8 in Quick mode, 34 in Detailed — under a hard character budget.
+Those files are sent — up to 14, each capped at 12,000 characters, 110,000 in total — under one budget for every question. There used to be Quick and Detailed modes; they were removed because nobody can judge how much context a question needs before reading the answer. The model matches depth to the question and fetches more itself when it needs to.
 
 **A project map.** Every file in the repository is listed on one line each (path, size, what it declares, what it imports) for roughly 1% of the tokens the source would cost, so the model knows what exists even though it has only read a few files.
 
-**On-demand file reads.** The model can call a `read_files` tool to open any path from the map mid-answer, bounded to 3 rounds and a read budget. Retrieval guesses up front; this is the escape hatch when it guesses wrong.
+**On-demand tools.** The model can call `read_files` to open any path from the map, `search_code` to find a string anywhere (backed by a trigram index), `find_usages` to walk the import graph and `get_component` to locate a definition — bounded to 3 rounds and a read budget. Retrieval guesses up front; the tools are the escape hatch when it guesses wrong.
 
 Source text is stored in PostgreSQL at analysis time, so explanations keep working after the host wipes its ephemeral disk.
 
@@ -150,4 +152,4 @@ Source text is stored in PostgreSQL at analysis time, so explanations keep worki
 
 ## Roadmap (post-MVP)
 
-Languages beyond React/TypeScript (the parser sits behind an interface), an MCP server so the analysis works inside coding agents, GitHub import, and streaming responses.
+Languages beyond React/TypeScript (the parser sits behind its own module), an MCP server so the analysis works inside coding agents, GitHub import, a job queue so processing runs on separate workers, and hybrid keyword + embedding retrieval (pgvector) for questions whose wording shares nothing with file names.

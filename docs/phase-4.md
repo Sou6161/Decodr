@@ -1,5 +1,7 @@
 # Phase 4 — Interactive Relationship Graph
 
+> Historical build log from when the project was called Arcloom. It describes each phase as it shipped; for how the code works today see [interview-guide.md](interview-guide.md).
+
 Turns the persisted component graph into an explorable React Flow visualization.
 
 ## Backend

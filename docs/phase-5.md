@@ -1,5 +1,7 @@
 # Phase 5 — Repository Dashboard
 
+> Historical build log from when the project was called Arcloom. It describes each phase as it shipped; for how the code works today see [interview-guide.md](interview-guide.md).
+
 Aggregate insights for an analyzed repository.
 
 ## Backend

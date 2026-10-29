@@ -18,6 +18,13 @@ const EnvSchema = z.object({
   // Hosting platforms (Render, etc.) inject PORT; prefer it when present.
   PORT: z.coerce.number().int().positive().optional(),
   WEB_ORIGIN: z.string().default('http://localhost:5173'),
+  /**
+   * Optional cookie domain, e.g. ".imsrb.in", for when the API is served from
+   * the web app's own site (api.imsrb.in). The session cookie then becomes
+   * first-party (SameSite=Lax), which browsers that block third-party cookies
+   * still accept. Leave unset while the API lives on a different site.
+   */
+  COOKIE_DOMAIN: z.string().optional(),
 
   DATABASE_URL: z.string().min(1, 'DATABASE_URL is required'),
 

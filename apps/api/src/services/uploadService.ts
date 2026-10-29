@@ -1,8 +1,10 @@
+import type { Repository as RepositoryModel } from '@prisma/client';
 import type { Repository } from '@decodr/types';
 import { RepositoryStatus } from '@decodr/types';
 import { repositoryRepository } from '../repositories/repositoryRepository.js';
 import { toRepositoryDto } from '../repositories/repositoryMapper.js';
 import { AppError } from '../utils/AppError.js';
+import { removeFile } from '../utils/archive.js';
 import { processRepository, processFolder, type StagedFile } from './repositoryProcessor.js';
 
 /**
@@ -11,15 +13,38 @@ import { processRepository, processFolder, type StagedFile } from './repositoryP
  */
 const MAX_PROJECTS_PER_VISITOR = 10;
 
-/** Rejects the upload when the visitor is already at their project limit. */
-async function assertUnderProjectLimit(ownerToken: string): Promise<void> {
-  const existing = await repositoryRepository.countByOwner(ownerToken);
-  if (existing >= MAX_PROJECTS_PER_VISITOR) {
+/**
+ * Creates the PENDING project row, or rejects when the visitor is at their
+ * limit. The check and the insert are one atomic step (see
+ * `repositoryRepository.createUnderLimit`), so parallel uploads cannot slip
+ * past the cap.
+ */
+async function createProject(name: string, ownerToken: string): Promise<RepositoryModel> {
+  const repo = await repositoryRepository.createUnderLimit(
+    {
+      name: cleanName(name),
+      ownerToken,
+      status: RepositoryStatus.Pending,
+      // Replaced with the detected project root once scanning completes.
+      storagePath: 'pending',
+    },
+    MAX_PROJECTS_PER_VISITOR,
+  );
+  if (!repo) {
     throw AppError.badRequest(
       `You can keep up to ${MAX_PROJECTS_PER_VISITOR} projects at once. ` +
         'Delete one to upload another.',
     );
   }
+  return repo;
+}
+
+/**
+ * Deletes temp files of an upload that will never be processed. A rejected
+ * upload used to leave them behind in `_uploads` for good.
+ */
+async function discard(paths: string[]): Promise<void> {
+  await Promise.all(paths.map((p) => removeFile(p).catch(() => undefined)));
 }
 
 /** Cleans a raw folder/zip name into a display name. */
@@ -42,15 +67,14 @@ export const uploadService = {
     if (!file?.path) {
       throw AppError.badRequest('No file was uploaded under field "file".');
     }
-    await assertUnderProjectLimit(ownerToken);
 
-    const repo = await repositoryRepository.create({
-      name: cleanName(file.originalname),
-      ownerToken,
-      status: RepositoryStatus.Pending,
-      // Replaced with the detected project root once scanning completes.
-      storagePath: 'pending',
-    });
+    let repo: RepositoryModel;
+    try {
+      repo = await createProject(file.originalname, ownerToken);
+    } catch (err) {
+      await discard([file.path]);
+      throw err;
+    }
 
     // Detached: the processor extracts from the temp path, cleans it up, and
     // records failures as FAILED status itself.
@@ -71,14 +95,14 @@ export const uploadService = {
     if (params.files.length === 0) {
       throw AppError.badRequest('No source files were found in that folder.');
     }
-    await assertUnderProjectLimit(params.ownerToken);
 
-    const repo = await repositoryRepository.create({
-      name: cleanName(params.name),
-      ownerToken: params.ownerToken,
-      status: RepositoryStatus.Pending,
-      storagePath: 'pending',
-    });
+    let repo: RepositoryModel;
+    try {
+      repo = await createProject(params.name, params.ownerToken);
+    } catch (err) {
+      await discard(params.files.map((f) => f.tempPath));
+      throw err;
+    }
 
     void processFolder(repo.id, params.files);
 

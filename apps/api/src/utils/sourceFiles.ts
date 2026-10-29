@@ -50,9 +50,20 @@ export const MANIFEST_FILES = new Set([
   '.env.sample',
 ]);
 
+/**
+ * tsconfig.json, tsconfig.app.json, jsconfig.json. Kept so the parser can read
+ * `paths`/`baseUrl` and resolve `@/…` imports, which otherwise produced no
+ * edges at all in most Vite and Next projects.
+ *
+ * Must stay in sync with the server upload filter (`middleware/upload.ts`) and
+ * the client filter (`collectFiles.ts`).
+ */
+export const CONFIG_MANIFEST_RE = /^(tsconfig(\.[\w-]+)?|jsconfig)\.json$/i;
+
 /** True if the file is a manifest worth keeping for context (not for parsing). */
 export function isManifestFile(filePath: string): boolean {
-  return MANIFEST_FILES.has(path.basename(filePath).toLowerCase());
+  const base = path.basename(filePath).toLowerCase();
+  return MANIFEST_FILES.has(base) || CONFIG_MANIFEST_RE.test(base);
 }
 
 /** True if the file extension is one Decodr treats as source code. */

@@ -1,4 +1,11 @@
-import { PrismaClient } from '@prisma/client';
+import { PrismaClient, type Prisma } from '@prisma/client';
+
+/**
+ * Either the shared client or the client of an open transaction. Repository
+ * functions that may run inside `prisma.$transaction` take one of these, so
+ * the same query code serves both.
+ */
+export type Db = Prisma.TransactionClient;
 import { isProd } from '../config/env.js';
 import { logger } from '../utils/logger.js';
 

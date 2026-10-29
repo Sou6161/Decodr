@@ -47,7 +47,8 @@ const uploader = multer({
  * counts disagree and the whole upload fails.
  */
 const SOURCE_FILE = /\.(tsx?|jsx?|mjs|cjs)$/i;
-const MANIFEST_FILE = /(^|\/)(package\.json|\.env\.example|\.env\.sample)$/i;
+const MANIFEST_FILE =
+  /(^|\/)(package\.json|\.env\.example|\.env\.sample|tsconfig(\.[\w-]+)?\.json|jsconfig\.json)$/i;
 const accepted = (name: string): boolean =>
   SOURCE_FILE.test(name) || MANIFEST_FILE.test(name);
 

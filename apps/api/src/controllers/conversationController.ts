@@ -23,6 +23,9 @@ const AskBodySchema = z.object({
     .max(4000, 'Question is too long — keep it under 4000 characters'),
 });
 
+/** Gap between SSE keep-alive comments; under common 30–60s proxy idle timeouts. */
+const HEARTBEAT_MS = 15_000;
+
 const RenameBodySchema = z.object({
   title: z.string().trim().min(1, 'Title cannot be empty').max(120, 'Title is too long'),
 });
@@ -88,6 +91,14 @@ export const conversationController = {
       logger.info('Explain stopped by the reader — upstream request cancelled');
     });
 
+    // A comment line every 15s while nothing else is being sent. A tool round
+    // or a slow model can go quiet for longer than a proxy's idle timeout, and
+    // a proxy that sees no bytes closes the connection mid-answer. SSE clients
+    // ignore comment lines, so the reader never sees these.
+    const heartbeat = setInterval(() => {
+      if (!aborted && !res.writableEnded) res.write(': ping\n\n');
+    }, HEARTBEAT_MS);
+
     try {
       const result = await conversationService.ask({
         repositoryId: requireParam(req, 'id'),
@@ -123,6 +134,7 @@ export const conversationController = {
         err instanceof AppError ? err.message : 'Something went wrong generating the explanation.';
       send('error', { message });
     } finally {
+      clearInterval(heartbeat);
       res.end();
     }
   },

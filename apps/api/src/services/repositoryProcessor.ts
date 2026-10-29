@@ -11,9 +11,9 @@ import { fileRepository } from '../repositories/fileRepository.js';
 import { analyzeAndPersist } from './analysisService.js';
 
 /**
- * How much of each file to persist. Explanations truncate at 22k chars per file,
- * so anything beyond this is never sent to the model — storing more would only
- * grow the database.
+ * How much of each file to persist. Retrieval sends at most 12k chars of a file
+ * and `read_files` at most 22k, so anything beyond this is never sent to the
+ * model — storing more would only grow the database.
  */
 export const STORED_CONTENT_LIMIT = 64_000;
 
@@ -64,6 +64,9 @@ async function runAnalysis(repositoryId: string, projectDir: string): Promise<vo
     repositoryId,
     scan.projectRoot,
     persistedFiles.map((f) => ({ id: f.id, path: f.path })),
+    // The full text the scanner read (not the capped DB copy), so nothing is
+    // read from disk twice and parsing sees whole files.
+    new Map(scan.files.map((f) => [f.relativePath, f.content])),
   );
 
   await repositoryRepository.update(repositoryId, {

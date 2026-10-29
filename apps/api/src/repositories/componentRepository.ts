@@ -1,5 +1,5 @@
 import type { Prisma } from '@prisma/client';
-import { prisma } from '../database/prisma.js';
+import { prisma, type Db } from '../database/prisma.js';
 
 /** A component row joined with its file path (for key building + DTOs). */
 export type ComponentWithPath = Prisma.ComponentGetPayload<{
@@ -7,25 +7,25 @@ export type ComponentWithPath = Prisma.ComponentGetPayload<{
 }>;
 
 export const componentRepository = {
-  createMany(rows: Prisma.ComponentCreateManyInput[]): Promise<Prisma.BatchPayload> {
-    return prisma.component.createMany({ data: rows, skipDuplicates: true });
+  createMany(rows: Prisma.ComponentCreateManyInput[], db: Db = prisma): Promise<Prisma.BatchPayload> {
+    return db.component.createMany({ data: rows, skipDuplicates: true });
   },
 
-  listByRepository(repositoryId: string): Promise<ComponentWithPath[]> {
-    return prisma.component.findMany({
+  listByRepository(repositoryId: string, db: Db = prisma): Promise<ComponentWithPath[]> {
+    return db.component.findMany({
       where: { repositoryId },
       include: { file: { select: { path: true } } },
       orderBy: { name: 'asc' },
     });
   },
 
-  deleteByRepository(repositoryId: string): Promise<Prisma.BatchPayload> {
-    return prisma.component.deleteMany({ where: { repositoryId } });
+  deleteByRepository(repositoryId: string, db: Db = prisma): Promise<Prisma.BatchPayload> {
+    return db.component.deleteMany({ where: { repositoryId } });
   },
 
   /** Recomputes each component's in-degree from persisted edges. */
-  updateImportedByCounts(repositoryId: string): Promise<number> {
-    return prisma.$executeRaw`
+  updateImportedByCounts(repositoryId: string, db: Db = prisma): Promise<number> {
+    return db.$executeRaw`
       UPDATE "Component" c
       SET "importedByCount" = sub.cnt
       FROM (

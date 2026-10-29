@@ -1,9 +1,9 @@
 import type { Hook as HookModel, Prisma } from '@prisma/client';
-import { prisma } from '../database/prisma.js';
+import { prisma, type Db } from '../database/prisma.js';
 
 export const hookRepository = {
-  createMany(rows: Prisma.HookCreateManyInput[]): Promise<Prisma.BatchPayload> {
-    return prisma.hook.createMany({ data: rows, skipDuplicates: true });
+  createMany(rows: Prisma.HookCreateManyInput[], db: Db = prisma): Promise<Prisma.BatchPayload> {
+    return db.hook.createMany({ data: rows, skipDuplicates: true });
   },
 
   listByRepository(repositoryId: string): Promise<HookModel[]> {
@@ -13,7 +13,7 @@ export const hookRepository = {
     });
   },
 
-  deleteByRepository(repositoryId: string): Promise<Prisma.BatchPayload> {
-    return prisma.hook.deleteMany({ where: { repositoryId } });
+  deleteByRepository(repositoryId: string, db: Db = prisma): Promise<Prisma.BatchPayload> {
+    return db.hook.deleteMany({ where: { repositoryId } });
   },
 };

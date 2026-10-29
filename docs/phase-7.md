@@ -1,5 +1,7 @@
 # Phase 7 — Polish
 
+> Historical build log from when the project was called Arcloom. It describes each phase as it shipped; for how the code works today see [interview-guide.md](interview-guide.md).
+
 UX polish, animations, responsiveness, performance, and cleanup.
 
 ## What was added

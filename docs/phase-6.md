@@ -1,5 +1,7 @@
 # Phase 6 — Context-Aware AI Explanations
 
+> Historical build log from when the project was called Arcloom. It describes each phase as it shipped; for how the code works today see [interview-guide.md](interview-guide.md).
+
 The finale: ask how a feature works and get a focused, senior-engineer-style
 explanation generated from **only** the relevant files — never the whole repo.
 

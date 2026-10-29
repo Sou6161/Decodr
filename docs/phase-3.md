@@ -1,5 +1,7 @@
 # Phase 3 — React Parser & Component Graph
 
+> Historical build log from when the project was called Arcloom. It describes each phase as it shipped; for how the code works today see [interview-guide.md](interview-guide.md).
+
 Static analysis via the **TypeScript Compiler API** (no regular expressions).
 This is the analytical core: it turns extracted source into components, hooks,
 routes, imports, and the component relationship graph.

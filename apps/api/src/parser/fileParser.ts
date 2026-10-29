@@ -6,6 +6,7 @@ import type {
   ParsedHook,
   ParsedImport,
   ParsedImportName,
+  ParsedReExport,
 } from './types.js';
 import {
   collectRenderedTags,
@@ -17,7 +18,7 @@ import {
   nameFromPath,
   scriptKindFor,
 } from './astUtils.js';
-import { isRelativeSpecifier, resolveModule } from './moduleResolver.js';
+import { isRelativeSpecifier, resolveModule, type AliasConfig } from './moduleResolver.js';
 import { parseRoutes } from './routeParser.js';
 
 /** Exported-symbol summary for a file (populated in a first pass). */
@@ -37,6 +38,8 @@ export function parseFile(
   filePath: string,
   content: string,
   knownFiles: ReadonlySet<string>,
+  /** tsconfig/jsconfig `paths` and `baseUrl`, so `@/components/X` resolves. */
+  aliases: readonly AliasConfig[] = [],
 ): ParsedFile {
   const sourceFile = ts.createSourceFile(
     filePath,
@@ -46,19 +49,143 @@ export function parseFile(
     scriptKindFor(filePath),
   );
 
-  const imports = parseImports(sourceFile, filePath, knownFiles);
+  const resolve = (specifier: string) => resolveModule(filePath, specifier, knownFiles, aliases);
+  const imports = [...parseImports(sourceFile, resolve), ...parseLazyImports(sourceFile, resolve)];
+  const reExports = parseReExports(sourceFile, resolve);
   const exports = collectExports(sourceFile);
   const { components, hooks } = collectDeclarations(sourceFile, filePath, exports);
   const routes = parseRoutes(sourceFile);
 
-  return { path: filePath, components, hooks, imports, routes };
+  return { path: filePath, components, hooks, imports, reExports, routes };
 }
 
-function parseImports(
-  sourceFile: ts.SourceFile,
-  filePath: string,
-  knownFiles: ReadonlySet<string>,
-): ParsedImport[] {
+type Resolve = (specifier: string) => string | null;
+
+function toImport(specifier: string, resolve: Resolve, names: ParsedImportName[]): ParsedImport {
+  const resolvedPath = resolve(specifier);
+  return {
+    moduleSpecifier: specifier,
+    resolvedPath,
+    // An alias that resolved is local code; an unresolved bare name is a package.
+    isExternal: resolvedPath === null && !isRelativeSpecifier(specifier),
+    names,
+  };
+}
+
+/** `import('./X')` with a literal specifier, as written inside `lazy(...)`. */
+function dynamicImportSpecifier(node: ts.Node): string | null {
+  let found: string | null = null;
+  const visit = (n: ts.Node): void => {
+    if (found) return;
+    if (
+      ts.isCallExpression(n) &&
+      n.expression.kind === ts.SyntaxKind.ImportKeyword &&
+      n.arguments[0] &&
+      ts.isStringLiteralLike(n.arguments[0])
+    ) {
+      found = n.arguments[0].text;
+      return;
+    }
+    ts.forEachChild(n, visit);
+  };
+  visit(node);
+  return found;
+}
+
+/** True for `lazy(...)` and `React.lazy(...)`. */
+function isLazyCall(node: ts.Expression): node is ts.CallExpression {
+  if (!ts.isCallExpression(node)) return false;
+  const callee = node.expression;
+  if (ts.isIdentifier(callee)) return callee.text === 'lazy';
+  return ts.isPropertyAccessExpression(callee) && callee.name.text === 'lazy';
+}
+
+/** True for `require('./x')` with a literal specifier. */
+function requireSpecifier(node: ts.Expression): string | null {
+  if (
+    ts.isCallExpression(node) &&
+    ts.isIdentifier(node.expression) &&
+    node.expression.text === 'require' &&
+    node.arguments[0] &&
+    ts.isStringLiteralLike(node.arguments[0])
+  ) {
+    return node.arguments[0].text;
+  }
+  return null;
+}
+
+/**
+ * Imports that are not import declarations, but bind a local name to another
+ * module just the same:
+ *
+ *   const Settings = lazy(() => import('./Settings'));   // code-split route
+ *   const Header = require('./Header');                    // CommonJS
+ *
+ * Both read as default imports. Route-level code splitting is common enough
+ * that ignoring it left a router's every screen disconnected from the graph.
+ */
+function parseLazyImports(sourceFile: ts.SourceFile, resolve: Resolve): ParsedImport[] {
+  const imports: ParsedImport[] = [];
+  for (const statement of sourceFile.statements) {
+    if (!ts.isVariableStatement(statement)) continue;
+    for (const decl of statement.declarationList.declarations) {
+      if (!decl.initializer) continue;
+      const lazySpec = isLazyCall(decl.initializer) ? dynamicImportSpecifier(decl.initializer) : null;
+      const specifier = lazySpec ?? requireSpecifier(decl.initializer);
+      if (!specifier) continue;
+
+      if (ts.isIdentifier(decl.name)) {
+        imports.push(
+          toImport(specifier, resolve, [{ local: decl.name.text, imported: 'default', isDefault: true }]),
+        );
+      } else if (!lazySpec && ts.isObjectBindingPattern(decl.name)) {
+        // const { Header, Footer: Foot } = require('./layout')
+        const names: ParsedImportName[] = [];
+        for (const el of decl.name.elements) {
+          if (!ts.isIdentifier(el.name)) continue;
+          const imported =
+            el.propertyName && ts.isIdentifier(el.propertyName) ? el.propertyName.text : el.name.text;
+          names.push({ local: el.name.text, imported, isDefault: false });
+        }
+        imports.push(toImport(specifier, resolve, names));
+      }
+    }
+  }
+  return imports;
+}
+
+/** `export { A } from './a'`, `export { default as B } from './b'`, `export * from './c'`. */
+function parseReExports(sourceFile: ts.SourceFile, resolve: Resolve): ParsedReExport[] {
+  const out: ParsedReExport[] = [];
+  for (const statement of sourceFile.statements) {
+    if (
+      !ts.isExportDeclaration(statement) ||
+      !statement.moduleSpecifier ||
+      !ts.isStringLiteral(statement.moduleSpecifier)
+    ) {
+      continue;
+    }
+    const resolvedPath = resolve(statement.moduleSpecifier.text);
+    const clause = statement.exportClause;
+    if (!clause) {
+      out.push({ exported: '*', imported: '*', resolvedPath });
+    } else if (ts.isNamespaceExport(clause)) {
+      // export * as UI from './ui' — UI.Button is followed through '*'.
+      out.push({ exported: clause.name.text, imported: '*', resolvedPath });
+    } else {
+      for (const el of clause.elements) {
+        out.push({
+          exported: el.name.text,
+          imported: (el.propertyName ?? el.name).text,
+          resolvedPath,
+        });
+      }
+    }
+  }
+  return out;
+}
+
+function parseImports(sourceFile: ts.SourceFile, resolve: Resolve): ParsedImport[] {
   const imports: ParsedImport[] = [];
 
   for (const statement of sourceFile.statements) {
@@ -90,12 +217,7 @@ function parseImports(
       }
     }
 
-    imports.push({
-      moduleSpecifier: specifier,
-      resolvedPath: resolveModule(filePath, specifier, knownFiles),
-      isExternal: !isRelativeSpecifier(specifier),
-      names,
-    });
+    imports.push(toImport(specifier, resolve, names));
   }
 
   return imports;
@@ -113,6 +235,9 @@ function collectExports(sourceFile: ts.SourceFile): ExportInfo {
       }
     } else if (
       ts.isExportDeclaration(statement) &&
+      // `export { X } from './x'` re-exports another file's X; it says nothing
+      // about a local X, so it belongs to parseReExports, not here.
+      !statement.moduleSpecifier &&
       statement.exportClause &&
       ts.isNamedExports(statement.exportClause)
     ) {

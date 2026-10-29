@@ -1,5 +1,7 @@
 # Phase 2 — Upload, Extraction & Scanning
 
+> Historical build log from when the project was called Arcloom. It describes each phase as it shipped; for how the code works today see [interview-guide.md](interview-guide.md).
+
 ZIP upload → extraction → repository scan, with live progress.
 
 ## Flow

@@ -15,6 +15,7 @@ import { getRepositoryGraph } from '../services/graphService.js';
 import { getDashboard } from '../services/dashboardService.js';
 import { fileService } from '../services/fileService.js';
 import { AppError } from '../utils/AppError.js';
+import { removeFile } from '../utils/archive.js';
 
 /** Thin HTTP layer: parse input, call a service, shape the response. */
 export const repositoryController = {
@@ -70,14 +71,21 @@ export const repositoryController = {
       throw AppError.badRequest('No source files were uploaded.');
     }
 
+    // A rejected upload must not leave its files in the temp directory —
+    // that is where the stranded uploads on disk came from.
+    const reject = async (message: string): Promise<never> => {
+      await Promise.all(files.map((f) => removeFile(f.path).catch(() => undefined)));
+      throw AppError.badRequest(message);
+    };
+
     let manifest: unknown;
     try {
       manifest = JSON.parse(String(req.body.manifest ?? '[]'));
     } catch {
-      throw AppError.badRequest('Invalid upload manifest.');
+      return reject('Invalid upload manifest.');
     }
     if (!Array.isArray(manifest) || manifest.length !== files.length) {
-      throw AppError.badRequest('Upload manifest does not match the uploaded files.');
+      return reject('Upload manifest does not match the uploaded files.');
     }
 
     const staged = files.map((f, i) => ({

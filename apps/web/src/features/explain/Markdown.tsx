@@ -1,4 +1,4 @@
-import { createContext, Fragment, useContext, useState, type ReactNode } from 'react';
+import { createContext, Fragment, memo, useContext, useState, type ReactNode } from 'react';
 
 /**
  * Minimal, dependency-free markdown renderer for the subset the explanation
@@ -17,14 +17,48 @@ export function Markdown({
   content: string;
   onOpenFile?: (path: string, line?: number) => void;
 }) {
+  const { settled, tail } = splitSettled(content);
   // Spacing is set per block rather than with a uniform gap: a heading needs
   // room above it and little below, so it binds to the text it introduces.
   return (
     <FileLinkContext.Provider value={onOpenFile ?? null}>
-      <div className="text-[14.5px] leading-7 text-foreground/90">{renderBlocks(content)}</div>
+      <div className="text-[14.5px] leading-7 text-foreground/90">
+        <SettledBlocks text={settled} />
+        {renderBlocks(tail)}
+      </div>
     </FileLinkContext.Provider>
   );
 }
+
+/**
+ * Splits markdown at the last blank line that sits OUTSIDE a code fence.
+ *
+ * While an answer streams, the whole growing string used to be re-parsed on
+ * every token — quadratic over the answer. Everything before that blank line
+ * is finished blocks that the next token cannot change, so it renders through
+ * a memoised component and only the tail is parsed again. A blank line inside
+ * an open fence is not a boundary: the code block is still being written.
+ */
+export function splitSettled(md: string): { settled: string; tail: string } {
+  const text = md.replace(/\r\n/g, '\n');
+  let inFence = false;
+  let boundary = -1;
+  let lineStart = 0;
+  for (let i = 0; i <= text.length; i += 1) {
+    if (i < text.length && text[i] !== '\n') continue;
+    const line = text.slice(lineStart, i);
+    if (line.trimStart().startsWith('```')) inFence = !inFence;
+    else if (!inFence && line.trim() === '' && lineStart > 0) boundary = lineStart;
+    lineStart = i + 1;
+  }
+  if (boundary <= 0) return { settled: '', tail: text };
+  return { settled: text.slice(0, boundary), tail: text.slice(boundary) };
+}
+
+/** Finished blocks; re-renders only when the settled text itself changes. */
+const SettledBlocks = memo(function SettledBlocks({ text }: { text: string }) {
+  return <>{text ? renderBlocks(text) : null}</>;
+});
 
 /**
  * Passed through context rather than down every render helper. The block and
