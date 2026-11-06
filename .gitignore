@@ -33,3 +33,5 @@ apps/api/prisma/*.db
 
 # Test / coverage
 coverage/
+
+*.md

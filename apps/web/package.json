@@ -11,9 +11,10 @@
     "test": "vitest run"
   },
   "dependencies": {
-    "@decodr/types": "*",
     "@dagrejs/dagre": "^1.1.4",
+    "@decodr/types": "*",
     "@tanstack/react-query": "^5.62.7",
+    "@vercel/analytics": "^2.0.1",
     "@xyflow/react": "^12.3.6",
     "clsx": "^2.1.1",
     "framer-motion": "^11.15.0",
