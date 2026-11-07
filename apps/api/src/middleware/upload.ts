@@ -77,7 +77,7 @@ function translateMulterError(err: unknown): AppError | unknown {
     if (err.code === 'LIMIT_FILE_COUNT') {
       return AppError.badRequest('Too many files. Try uploading a smaller folder or a ZIP.');
     }
-    return AppError.badRequest(`Upload failed: ${err.message}`);
+    return AppError.badRequest("The upload didn't go through. Please try again.");
   }
   return err;
 }

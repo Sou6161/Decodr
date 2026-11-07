@@ -2,7 +2,7 @@ import { Suspense, useEffect, useState } from 'react';
 import { Outlet, useNavigate, useParams } from 'react-router-dom';
 import { useQueryClient } from '@tanstack/react-query';
 import { RepositoryStatus } from '@decodr/types';
-import { PageHeader } from '@/components/PageHeader';
+import { StationBoard, lineColorFor } from '@/components/transit';
 import { Badge, ConfirmDialog, ErrorState, Skeleton } from '@/components/ui';
 import { TrashIcon } from '@/components/icons';
 import {
@@ -80,24 +80,28 @@ export function RepositoryLayout() {
 
   return (
     <div>
-      <PageHeader
-        title={repo.name}
-        description={ready ? undefined : 'Processing project'}
-        actions={
-          <div className="flex items-center gap-2">
-            <Badge tone={status.tone}>{status.label}</Badge>
-            <button
-              type="button"
-              onClick={() => setConfirmOpen(true)}
-              aria-label="Delete project"
-              className="rounded-lg p-2 text-subtle transition-colors hover:bg-danger/15 hover:text-danger"
-              title="Delete project"
-            >
-              <TrashIcon width={16} height={16} />
-            </button>
-          </div>
-        }
-      />
+      <div className="mb-8 flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+        <div className="min-w-0">
+          <StationBoard name={repo.name} color={lineColorFor(repo.name)} size="lg" />
+          <p className="mt-3 font-mono text-[11px] text-subtle">
+            {ready
+              ? `${repo.fileCount} files · ${repo.componentCount} components · ${repo.hookCount} hooks · ${repo.routeCount} routes · added ${new Date(repo.createdAt).toLocaleDateString()}`
+              : 'Processing project'}
+          </p>
+        </div>
+        <div className="flex items-center gap-2">
+          <Badge tone={status.tone}>{status.label}</Badge>
+          <button
+            type="button"
+            onClick={() => setConfirmOpen(true)}
+            aria-label="Delete project"
+            className="rounded-lg p-2 text-subtle transition-colors hover:bg-danger/15 hover:text-danger"
+            title="Delete project"
+          >
+            <TrashIcon width={16} height={16} />
+          </button>
+        </div>
+      </div>
 
       <ConfirmDialog
         open={confirmOpen}

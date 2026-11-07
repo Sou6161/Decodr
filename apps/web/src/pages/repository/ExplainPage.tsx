@@ -4,7 +4,6 @@ import { AnimatePresence, motion } from 'framer-motion';
 import type { Message, Repository } from '@decodr/types';
 import { MessageRole } from '@decodr/types';
 import { Button, Card, Skeleton, Spinner } from '@/components/ui';
-import { SparkIcon } from '@/components/icons';
 import { useRepositoryGraph } from '@/features/graph/hooks';
 import {
   useAsk,
@@ -301,15 +300,21 @@ export function ExplainPage() {
       )}
       <div className="space-y-4">
         {showEmpty && !ask.isPending && (
-          <div className="rounded-2xl border border-border bg-surface/50 p-6">
-            <div className="flex items-center gap-2 text-primary">
-              <SparkIcon width={18} height={18} />
-              <h3 className="text-sm font-semibold text-foreground">Ask about this project</h3>
+          <div className="pop overflow-hidden rounded-2xl border border-border bg-surface">
+            <div className="flex items-center gap-3 bg-ink px-5 py-3">
+              <span className="grid h-7 w-7 place-items-center rounded-md bg-line-blue font-display text-base font-extrabold italic text-white">
+                i
+              </span>
+              <span className="font-mono text-[11px] uppercase tracking-[0.18em] text-white/80">
+                Information
+              </span>
             </div>
+            <div className="p-6">
+            <h3 className="font-display text-xl font-bold text-foreground">Ask about this project</h3>
             <p className="mt-1.5 text-sm text-muted">
-              Questions about the code get answered from the files they're actually about — never
-              the whole repo at once. General React and TypeScript questions get answered too.
-              Chats are saved in the sidebar.
+              Ask about the code and the answer comes from the files it's about, not the whole repo at
+              once. General React and TypeScript questions work too. Your chats are saved in the
+              sidebar.
             </p>
             <div className="mt-4 flex flex-wrap gap-2">
               {suggestions.map((s) => (
@@ -317,11 +322,12 @@ export function ExplainPage() {
                   key={s}
                   type="button"
                   onClick={() => submit(s)}
-                  className="rounded-full border border-border bg-surface-raised px-3 py-1.5 text-xs text-muted transition-colors hover:border-border-strong hover:text-foreground"
+                  className="rounded-full border border-border bg-background px-3.5 py-1.5 text-xs font-medium text-muted transition-colors hover:border-foreground hover:text-foreground"
                 >
-                  {s}
+                  {s} →
                 </button>
               ))}
+            </div>
             </div>
           </div>
         )}
@@ -356,7 +362,7 @@ export function ExplainPage() {
               <Card className="mt-4 p-5">
                 {ask.rereading && ask.streamed === '' && (
                   <p className="mb-2 text-[11px] text-subtle">
-                    Opened more files — starting the answer again with them.
+                    Opened more files, so the answer is starting over with them.
                   </p>
                 )}
                 {ask.streamed ? (
@@ -474,7 +480,7 @@ export function ExplainPage() {
               ))}
               {mentions.total > mentions.suggestions.length && (
                 <li className="px-2.5 py-1.5 text-[11px] text-subtle">
-                  +{mentions.total - mentions.suggestions.length} more — keep typing to narrow it
+                  +{mentions.total - mentions.suggestions.length} more. Keep typing to narrow it down.
                   down
                 </li>
               )}

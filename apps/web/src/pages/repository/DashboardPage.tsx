@@ -9,15 +9,8 @@ import {
   ErrorState,
   Skeleton,
 } from '@/components/ui';
-import {
-  FileIcon,
-  FolderIcon,
-  GraphIcon,
-  DashboardIcon,
-  SparkIcon,
-} from '@/components/icons';
 import { useDashboard } from '@/features/dashboard/hooks';
-import { RankedList, StatTile } from '@/features/dashboard/DashboardWidgets';
+import { DepartureBoard, RankedList } from '@/features/dashboard/DashboardWidgets';
 import { FolderTree } from '@/features/dashboard/FolderTree';
 import { fadeUpItem, staggerContainer } from '@/utils/motion';
 
@@ -47,26 +40,23 @@ export function DashboardPage() {
     );
   }
 
-  const tiles = [
-    { label: 'Files', value: stats.totalFiles, icon: <FileIcon width={16} height={16} /> },
-    { label: 'Folders', value: stats.totalFolders, icon: <FolderIcon width={16} height={16} /> },
-    { label: 'Components', value: stats.totalComponents, icon: <GraphIcon width={16} height={16} /> },
-    { label: 'Hooks', value: stats.totalHooks, icon: <SparkIcon width={16} height={16} /> },
-    { label: 'Routes', value: stats.totalRoutes, icon: <DashboardIcon width={16} height={16} /> },
-    { label: 'Lines', value: stats.totalLines, icon: <DashboardIcon width={16} height={16} /> },
+  const cells = [
+    { label: 'Files', value: stats.totalFiles },
+    { label: 'Folders', value: stats.totalFolders },
+    { label: 'Components', value: stats.totalComponents },
+    { label: 'Hooks', value: stats.totalHooks },
+    { label: 'Routes', value: stats.totalRoutes },
+    { label: 'Lines', value: stats.totalLines },
   ];
 
   return (
     <motion.div variants={staggerContainer} initial="hidden" animate="show" className="space-y-6">
-      <motion.div
-        variants={staggerContainer}
-        className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-6"
-      >
-        {tiles.map((t) => (
-          <motion.div key={t.label} variants={fadeUpItem}>
-            <StatTile {...t} />
-          </motion.div>
-        ))}
+      <motion.div variants={fadeUpItem}>
+        <DepartureBoard
+          title="At a glance"
+          note={`${stats.totalFiles} files across ${stats.totalFolders} folders`}
+          cells={cells}
+        />
       </motion.div>
 
       {/* Project structure — the clearest read on how the codebase is organized. */}
@@ -93,12 +83,14 @@ export function DashboardPage() {
         <RankedList
           title="Largest components"
           unit="lines"
+          color="var(--color-line-blue)"
           items={stats.largestComponents}
           emptyLabel="No components detected."
         />
         <RankedList
           title="Most imported components"
           unit="imports"
+          color="var(--color-line-orange)"
           items={stats.mostImportedComponents}
           emptyLabel="No shared components yet."
         />

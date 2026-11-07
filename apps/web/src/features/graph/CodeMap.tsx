@@ -26,10 +26,10 @@ import { useRepositoryEntities } from './hooks';
  * nothing — so the colour channel carried no variation and the chart only
  * looked encoded. Two single-hue charts say the same thing honestly.
  *
- * Both steps pass the skill's chroma and contrast checks on a dark surface.
+ * Both are the theme's route blue and orange, and read clearly on the light surface.
  */
-const SIZE_HUE = '#3987e5';
-const SHARED_HUE = '#d95926';
+const SIZE_HUE = '#2f6fde';
+const SHARED_HUE = '#f26a1b';
 
 const ROUTE_DIRS = /(^|\/)(app|pages|screens|routes|views)(\/|$)/i;
 const SHOWN = 16;
@@ -122,7 +122,7 @@ export function CodeMap({ graph, repoId }: { graph: RepositoryGraph; repoId: str
           hovered={hovered}
           setHovered={setHovered}
           onExplain={explain}
-          empty="Nothing is shared yet — no component imports another."
+          empty="Nothing is shared yet. No component imports another."
         />
       </div>
     </div>

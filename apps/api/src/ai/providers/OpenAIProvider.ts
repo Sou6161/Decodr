@@ -77,6 +77,64 @@ export function worthRetryingElsewhere(status: number | undefined, err: unknown)
 }
 
 /**
+ * Whether a model draws on the account's shared free-request quota. Every
+ * `:free` model does, and so does OpenRouter's free router.
+ */
+export function isFreeModel(model: string): boolean {
+  return model.endsWith(':free') || model === 'openrouter/free';
+}
+
+/**
+ * When the account's daily free-model quota resets, if this error says it is
+ * used up; otherwise null.
+ *
+ * This is not an ordinary rate limit. OpenRouter caps free-model requests per
+ * ACCOUNT per day — 50 on a free-tier account — and every free model draws on
+ * the same allowance. Once it is gone, trying the next free model in the chain
+ * is a guaranteed failure, and so is every retry until the reset.
+ */
+export function freeQuotaResetAt(err: unknown, now = Date.now()): number | null {
+  if (!(err instanceof OpenAI.APIError) || err.status !== 429) return null;
+  const body = err.error as
+    | { message?: string; metadata?: { headers?: Record<string, string> } }
+    | undefined;
+  if (!/free-models-per-day/i.test(`${body?.message ?? ''} ${err.message}`)) return null;
+
+  const raw =
+    (err.headers as Headers | undefined)?.get?.('x-ratelimit-reset') ??
+    body?.metadata?.headers?.['X-RateLimit-Reset'];
+  const reset = Number(raw);
+  if (Number.isFinite(reset) && reset > now) return reset;
+  // No usable header: the cap is per UTC day, so it resets at the next midnight.
+  const d = new Date(now);
+  return Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate() + 1);
+}
+
+/** What the reader is told when the day's free quota is spent. */
+export function quotaExhaustedMessage(resetsAt: number, now = Date.now()): string {
+  const hours = Math.max(1, Math.round((resetsAt - now) / 3_600_000));
+  return (
+    "Today's AI quota has been used up, so questions can't be answered right now. " +
+    `It resets in about ${hours} hour${hours === 1 ? '' : 's'}.`
+  );
+}
+
+/**
+ * How long a failed model goes to the back of the queue.
+ *
+ * Scaled to how long the cause usually lasts. Exhausted credits and a withdrawn
+ * model do not recover in seconds; a rate limit or an overloaded pool often
+ * does. A model in cooldown is still tried as a last resort, so getting these
+ * too long costs latency on a recovered model, never a failed request.
+ */
+export function cooldownFor(status: number | undefined): number {
+  if (status === 402) return 10 * 60_000; // out of credits
+  if (status === 404 || status === 400) return 30 * 60_000; // model withdrawn or unknown
+  if (status === 429) return 60_000; // rate limited
+  return 20_000; // overloaded, 5xx, or a dropped connection
+}
+
+/**
  * Whether an error is the caller stopping the request on purpose.
  *
  * Checking `name === 'AbortError'` alone was not enough: the OpenAI SDK throws
@@ -186,18 +244,90 @@ export class OpenAIProvider implements AIProvider {
    * rate limits and exhausted credits are specific to a model or its pool, and
    * those are exactly what the free shared pools produce.
    */
+  /**
+   * When each recently failed model may be tried first again.
+   *
+   * Without this, a model that is out of credits or withdrawn was retried FIRST
+   * on every call — and one question makes several calls (tool rounds, the
+   * answer, its follow-ups, the thread title). Each paid a doomed round trip
+   * before reaching a model that works.
+   */
+  private readonly coolingUntil = new Map<string, number>();
+  /** When each model last failed, so a stale success cannot undo a fresh failure. */
+  private readonly failedAt = new Map<string, number>();
+  /**
+   * Until when every free model is unusable because the account's daily free
+   * quota is spent. Unlike a cooldown this SKIPS models rather than reordering
+   * them: the reset time is known, and each attempt before it is a certain loss.
+   */
+  private freeQuotaResetsAt = 0;
+
+  /** True while the account has no free requests left today. */
+  private quotaBlocks(model: string, now = Date.now()): boolean {
+    return isFreeModel(model) && this.freeQuotaResetsAt > now;
+  }
+
+  /** The reader-facing error for a spent daily quota. */
+  private quotaError(): AppError {
+    return new AppError(429, 'AI_QUOTA_EXHAUSTED', quotaExhaustedMessage(this.freeQuotaResetsAt));
+  }
+
+  /**
+   * Models in the order to try them: those not cooling down first, in chain
+   * order, then the cooling ones. Cooling models are tried LAST rather than
+   * skipped, so an outage of every model still gets every model attempted —
+   * the cooldown only reorders, it never makes a request fail untried.
+   */
+  private attemptOrder(now = Date.now()): string[] {
+    const usable = this.chain.filter((m) => !this.quotaBlocks(m, now));
+    const ready = usable.filter((m) => (this.coolingUntil.get(m) ?? 0) <= now);
+    const cooling = usable.filter((m) => (this.coolingUntil.get(m) ?? 0) > now);
+    return [...ready, ...cooling];
+  }
+
+  /**
+   * Runs an attempt against each model in turn, moving on when the failure is
+   * one a different model could survive.
+   *
+   * Every model receives the SAME request — the full conversation, the attached
+   * files, every tool result so far — so a fallback picks up exactly where the
+   * failed model was, rather than starting a thinner conversation.
+   *
+   * A bad key or a malformed request will fail identically everywhere, so those
+   * stop immediately — retrying them would only multiply the latency. Overload,
+   * rate limits, exhausted credits and withdrawn models are specific to one
+   * model or its pool, and those are exactly what the free shared pools produce.
+   */
   private async withFallback(
     attempt: (model: string) => Promise<CompletionResult>,
     /** Called before a retry, so a partly-streamed answer can be discarded. */
     onRestart?: () => void,
   ): Promise<CompletionResult> {
     let lastError: unknown;
+    let lastModel = this.chain[0]!;
+    const order = this.attemptOrder();
+    // Every model is free and the quota is spent: answer at once, without
+    // sending a request that is certain to be refused.
+    if (order.length === 0) throw this.quotaError();
 
-    for (const [index, model] of this.chain.entries()) {
+    for (const [index, model] of order.entries()) {
+      // An earlier model in THIS call may have just discovered the quota is gone.
+      if (this.quotaBlocks(model)) continue;
+      const startedAt = Date.now();
       try {
         const result = await attempt(model);
-        if (index > 0) {
-          logger.info(`AI fell back to ${model} (primary: ${this.chain[0]})`);
+        // Only a request that began AFTER the model's last failure proves it has
+        // recovered. Calls overlap — a question's follow-ups run alongside the
+        // next question — and a model that is nearly out of credits still
+        // completes small requests while refusing large ones. A small call that
+        // started first and finished later was clearing the cooldown a large
+        // call had just set, so every answer went back to paying a 402.
+        if ((this.failedAt.get(model) ?? 0) < startedAt) {
+          this.coolingUntil.delete(model);
+          this.failedAt.delete(model);
+        }
+        if (model !== this.chain[0]) {
+          logger.info(`AI answered with ${model} (primary: ${this.chain[0]})`);
         }
         return result;
       } catch (err) {
@@ -205,16 +335,42 @@ export class OpenAIProvider implements AIProvider {
         // not be dressed up as an "AI request failed" error and logged as one.
         if (isAbort(err)) throw abortError();
         lastError = err;
+        lastModel = model;
         const status = err instanceof OpenAI.APIError ? err.status : undefined;
-        const isLast = index === this.chain.length - 1;
-        if (isLast || !worthRetryingElsewhere(status, err)) throw this.toAppError(err);
+        if (!worthRetryingElsewhere(status, err)) throw this.toAppError(err, model);
+
+        const quotaReset = freeQuotaResetAt(err);
+        if (quotaReset !== null) {
+          this.freeQuotaResetsAt = quotaReset;
+          logger.warn(
+            `AI free-model quota for today is spent; free models are skipped until ` +
+              `${new Date(quotaReset).toISOString()}`,
+          );
+        } else {
+          const cooldown = cooldownFor(status);
+          this.coolingUntil.set(model, Date.now() + cooldown);
+          this.failedAt.set(model, Date.now());
+        }
+
+        const next = order.slice(index + 1).find((m) => !this.quotaBlocks(m));
+        if (!next) break;
         logger.warn(
-          `AI model ${model} failed (${status ?? 'network'}); trying ${this.chain[index + 1]}`,
+          `AI model ${model} failed (${status ?? 'network'}); trying ${next}` +
+            (quotaReset === null
+              ? ` — ${model} is skipped for ${Math.round(cooldownFor(status) / 1000)}s`
+              : ''),
         );
         onRestart?.();
       }
     }
-    throw this.toAppError(lastError);
+
+    // Out of models. When the free quota is part of why, that is the honest
+    // explanation: "wait a moment" is wrong when the wait is until tomorrow.
+    if (this.freeQuotaResetsAt > Date.now()) {
+      this.toAppError(lastError, lastModel); // logs the upstream detail
+      throw this.quotaError();
+    }
+    throw this.toAppError(lastError, lastModel);
   }
 
   /** The shared request body for both completion modes. */
@@ -375,7 +531,7 @@ export class OpenAIProvider implements AIProvider {
   }
 
   /** Maps an SDK error to an AppError, surfacing the real cause of a connection failure. */
-  private toAppError(err: unknown): AppError {
+  private toAppError(err: unknown, model: string = this.model): AppError {
     if (err instanceof OpenAI.APIError) {
       const detail = (err.error as { message?: string } | undefined)?.message ?? err.message;
       // A connection failure carries no status; the reason is in the cause chain.
@@ -384,7 +540,7 @@ export class OpenAIProvider implements AIProvider {
 
       // The full upstream text stays here, where it is useful for debugging.
       logger.error(
-        `AI request failed (${err.status ?? 'network'}) model=${this.model} ` +
+        `AI request failed (${err.status ?? 'network'}) model=${model} ` +
           `baseURL=${this.baseURL ?? 'default'}: ${detail}${cause ? ` | cause: ${cause}` : ''}`,
       );
 

@@ -83,11 +83,39 @@ export const storageRoot = path.isAbsolute(env.STORAGE_DIR)
 
 export const isProd = env.NODE_ENV === 'production';
 
-/** The primary model followed by its fallbacks, de-duplicated. */
-export const modelChain: string[] = [
+/**
+ * The model of last resort on OpenRouter: its own router over whichever free
+ * models are live at that moment.
+ *
+ * Specific free model ids get withdrawn without notice — the configured fallback
+ * `poolside/laguna-s-2.1:free` disappeared, which left the chain one model long
+ * without anyone noticing. This id is OpenRouter's, not a model's, so it cannot
+ * be withdrawn the same way. Quality varies by whatever it routes to, which is
+ * why it goes LAST rather than being the default.
+ */
+export const LAST_RESORT_MODEL = 'openrouter/free';
+
+/**
+ * The primary model, its configured fallbacks, then the last resort.
+ *
+ * Fallback used to exist only if AI_FALLBACK_MODELS was set. Left unset, the
+ * chain was a single paid model, and when its credits ran out every question
+ * failed — the exact single point of failure the chain exists to remove. The
+ * safety net is now part of the chain whatever the configuration says.
+ */
+export function buildModelChain(primary: string, fallbacksCsv: string, baseURL: string): string[] {
+  return [
+    primary,
+    ...fallbacksCsv.split(',').map((m) => m.trim()).filter(Boolean),
+    ...(/openrouter\.ai/i.test(baseURL) ? [LAST_RESORT_MODEL] : []),
+  ].filter((m, i, all) => m && all.indexOf(m) === i);
+}
+
+export const modelChain: string[] = buildModelChain(
   env.AI_MODEL,
-  ...env.AI_FALLBACK_MODELS.split(',').map((m) => m.trim()).filter(Boolean),
-].filter((m, i, all) => all.indexOf(m) === i);
+  env.AI_FALLBACK_MODELS,
+  env.OPENAI_BASE_URL,
+);
 
 /**
  * Every origin allowed by CORS. WEB_ORIGIN may list several, comma-separated,

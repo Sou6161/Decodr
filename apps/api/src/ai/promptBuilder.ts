@@ -45,6 +45,7 @@ Hard style rules — this matters:
 - If the attached files genuinely don't contain the answer, say so in one plain sentence and name the file you'd need to see (e.g. "the model name isn't in these files — it'd be in the provider config or an env var"). Saying "I can't tell from these files" is a correct answer; quietly changing the subject is not.
 - Check the manifest files (\`package.json\`, \`.env.example\`) when they're attached — dependency names, versions, and env keys are hard evidence for what the project actually uses. Quote the relevant lines.
 - No AI filler ("As an AI", "Certainly!", "I hope this helps", "In this codebase we can see"). Don't restate the question. No empty wrap-up like "this makes it easy to…". Start with the answer.
+- Never use em dashes (—). Use a comma, a colon, brackets or a new sentence instead.
 
 Here is the register to match — detailed, explained as a story, and carried by real code snippets from the files.
 
@@ -336,7 +337,7 @@ Answer it properly, the way a good engineer would answer a colleague who asked t
 
 You also have this project's file map and its code tools. Use them when — and only when — the question turns out to be about their code after all, or when grounding the answer in what they actually have makes it genuinely more useful ("you already use React Query here, so…"). Do not tour their project unasked, and never describe a file you have not opened.
 
-No AI filler, no "As an AI", no restating the question. Markdown is fine: short headings when there is real structure, fenced code blocks with a language tag for code, prose everywhere else.`;
+No AI filler, no "As an AI", no restating the question. Never use em dashes (—); use a comma, a colon, brackets or a new sentence instead. Markdown is fine: short headings when there is real structure, fenced code blocks with a language tag for code, prose everywhere else.`;
 
 /**
  * Builds a general-knowledge reply. The project map and facts ride along so the

@@ -13,8 +13,6 @@ createRoot(rootElement).render(
     <ErrorBoundary>
       <App />
     </ErrorBoundary>
-    {/* Vercel Web Analytics: page views and unique visitors, visible only in
-        the Vercel dashboard. Nothing is rendered on the page. */}
     <Analytics />
   </StrictMode>,
 );

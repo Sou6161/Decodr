@@ -48,6 +48,14 @@ async function detectProjectRoot(extractedDir: string): Promise<string> {
   return current;
 }
 
+/**
+ * Same rule git uses: a NUL in the first 8000 characters means the file is
+ * binary (a misnamed asset, a compiled blob), not source worth mapping.
+ */
+export function looksBinary(content: string): boolean {
+  return content.slice(0, 8000).includes('\u0000');
+}
+
 /** Counts lines, ignoring a trailing newline so empty files report 0. */
 function countLines(content: string): number {
   if (content.length === 0) return 0;
@@ -78,6 +86,7 @@ export async function scanRepository(extractedDir: string): Promise<ScanResult> 
         stat(absolutePath),
         readFile(absolutePath, 'utf8'),
       ]);
+      if (looksBinary(content)) continue;
       const lineCount = countLines(content);
       totalLines += lineCount;
       files.push({

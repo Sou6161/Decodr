@@ -128,25 +128,25 @@ export const CompressIcon = (p: IconProps) => (
 export function Logo({ className }: { className?: string }) {
   return (
     <svg className={className} width="28" height="28" viewBox="0 0 32 32" fill="none" aria-hidden="true">
-      <rect width="32" height="32" rx="9" fill="var(--color-surface-raised)" />
+      <rect width="32" height="32" rx="9" fill="var(--color-primary)" />
       {/* diamond frame */}
       <path
         d="M16 5 L27 16 L16 27 L5 16 Z"
         fill="none"
-        stroke="var(--color-primary)"
+        stroke="#ffffff"
         strokeWidth="2"
         strokeLinejoin="round"
       />
       {/* weft thread (over) */}
-      <path d="M5 16 H27" stroke="var(--color-primary)" strokeWidth="2" strokeLinecap="round" />
+      <path d="M5 16 H27" stroke="#ffffff" strokeWidth="2" strokeLinecap="round" />
       {/* warp thread (under — gapped where the weft crosses) */}
-      <path d="M16 5 V12" stroke="var(--color-primary)" strokeWidth="2" strokeLinecap="round" />
-      <path d="M16 20 V27" stroke="var(--color-primary)" strokeWidth="2" strokeLinecap="round" />
+      <path d="M16 5 V12" stroke="#ffffff" strokeWidth="2" strokeLinecap="round" />
+      <path d="M16 20 V27" stroke="#ffffff" strokeWidth="2" strokeLinecap="round" />
       {/* corner nodes */}
-      <circle cx="16" cy="5" r="1.7" fill="var(--color-primary)" />
-      <circle cx="27" cy="16" r="1.7" fill="var(--color-primary)" />
-      <circle cx="16" cy="27" r="1.7" fill="var(--color-primary)" />
-      <circle cx="5" cy="16" r="1.7" fill="var(--color-primary)" />
+      <circle cx="16" cy="5" r="1.7" fill="#ffffff" />
+      <circle cx="27" cy="16" r="1.7" fill="#ffffff" />
+      <circle cx="16" cy="27" r="1.7" fill="#ffffff" />
+      <circle cx="5" cy="16" r="1.7" fill="#ffffff" />
       {/* the loom's knot */}
       <circle cx="16" cy="16" r="2.7" fill="var(--color-gold)" />
     </svg>

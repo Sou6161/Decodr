@@ -9,7 +9,7 @@ const VARIANTS: Record<Variant, string> = {
   primary:
     'bg-primary text-primary-foreground shadow-[0_4px_0_0_var(--color-primary-soft)] hover:brightness-110 active:translate-y-[3px] active:shadow-[0_1px_0_0_var(--color-primary-soft)]',
   secondary:
-    'bg-surface-raised text-foreground border-2 border-border-strong shadow-[0_4px_0_0_var(--color-border)] hover:brightness-110 active:translate-y-[3px] active:shadow-[0_1px_0_0_var(--color-border)]',
+    'bg-surface text-foreground border-2 border-border-strong shadow-[0_4px_0_0_var(--color-border-strong)] hover:bg-surface-raised active:translate-y-[3px] active:shadow-[0_1px_0_0_var(--color-border-strong)]',
   ghost: 'text-muted hover:text-foreground hover:bg-surface-raised',
   danger:
     'bg-danger text-white shadow-[0_4px_0_0_var(--color-danger-soft)] hover:brightness-110 active:translate-y-[3px] active:shadow-[0_1px_0_0_var(--color-danger-soft)]',

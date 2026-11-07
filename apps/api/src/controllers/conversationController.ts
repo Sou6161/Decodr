@@ -20,7 +20,7 @@ const AskBodySchema = z.object({
   question: z
     .string()
     .min(3, 'Question is too short')
-    .max(4000, 'Question is too long — keep it under 4000 characters'),
+    .max(4000, 'That question is too long. Keep it under 4,000 characters.'),
 });
 
 /** Gap between SSE keep-alive comments; under common 30–60s proxy idle timeouts. */

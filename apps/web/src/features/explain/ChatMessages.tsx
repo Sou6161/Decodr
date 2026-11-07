@@ -169,7 +169,7 @@ export function UserBubble({
       <div className="flex w-full justify-end">
         {/* whitespace-pre-wrap: a multi-line question the user typed should keep
             the shape they gave it rather than collapsing into one run-on line. */}
-        <div className="max-w-[85%] whitespace-pre-wrap rounded-2xl rounded-br-md border border-primary/30 bg-primary/10 px-4 py-2.5 text-sm leading-relaxed text-foreground">
+        <div className="max-w-[85%] whitespace-pre-wrap rounded-2xl rounded-br-md bg-foreground px-4 py-2.5 text-sm leading-relaxed text-background">
           {content}
         </div>
       </div>

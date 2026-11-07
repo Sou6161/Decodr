@@ -16,6 +16,8 @@ import {
   useRenameConversation,
 } from '@/features/explain/hooks';
 import { relativeTime } from '@/utils/time';
+import { useRepository } from '@/features/repositories/hooks';
+import { lineColorFor } from '@/components/transit';
 import type { ComponentType, MouseEvent, SVGProps } from 'react';
 
 interface NavItem {
@@ -30,13 +32,52 @@ const WORKSPACE_NAV: NavItem[] = [
   { to: '/upload', label: 'Upload', icon: UploadIcon },
 ];
 
-const navClass = ({ isActive }: { isActive: boolean }) =>
-  cn(
-    'flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors',
-    isActive
-      ? 'bg-surface-raised text-foreground'
-      : 'text-muted hover:bg-surface-raised/60 hover:text-foreground',
+/**
+ * Nav links drawn as stops on a line: a rail runs down the group and each link
+ * has a station dot that fills in teal when it's the current page.
+ */
+function StationLink({ item, onNavigate }: { item: NavItem; onNavigate?: () => void }) {
+  return (
+    <NavLink
+      to={item.to}
+      end={item.end}
+      onClick={onNavigate}
+      className={({ isActive }) =>
+        cn(
+          'group relative flex items-center gap-3 rounded-lg py-2 pl-9 pr-3 text-sm font-medium transition-colors',
+          isActive
+            ? 'bg-primary/10 font-semibold text-foreground'
+            : 'text-muted hover:bg-surface-raised hover:text-foreground',
+        )
+      }
+    >
+      {({ isActive }) => (
+        <>
+          <span
+            aria-hidden
+            className={cn(
+              'absolute left-[11px] top-1/2 h-3.5 w-3.5 -translate-y-1/2 rounded-full border-[3px] bg-surface transition-colors',
+              isActive ? 'border-primary' : 'border-border-strong group-hover:border-subtle',
+            )}
+          />
+          <item.icon width={17} height={17} />
+          {item.label}
+        </>
+      )}
+    </NavLink>
   );
+}
+
+function StationGroup({ items, onNavigate }: { items: NavItem[]; onNavigate?: () => void }) {
+  return (
+    <div className="relative">
+      <span aria-hidden className="absolute bottom-4 left-[16.5px] top-4 w-[4px] rounded-full bg-border" />
+      {items.map((item) => (
+        <StationLink key={item.to} item={item} onNavigate={onNavigate} />
+      ))}
+    </div>
+  );
+}
 
 export function Sidebar({ onNavigate }: { onNavigate?: () => void }) {
   const repoMatch = useMatch('/repositories/:id/*');
@@ -53,18 +94,14 @@ export function Sidebar({ onNavigate }: { onNavigate?: () => void }) {
         className="mb-6 flex items-center gap-2.5 px-2 transition-opacity hover:opacity-80"
       >
         <Logo />
-        <span className="text-base font-semibold tracking-tight">Decodr</span>
+        <span className="font-display text-lg font-bold tracking-tight">Decodr</span>
       </Link>
 
-      <p className="px-3 pb-1 text-[11px] font-medium uppercase tracking-wider text-subtle">
+      <p className="flex items-center gap-2 px-3 pb-2 font-mono text-[10px] uppercase tracking-[0.16em] text-subtle">
+        <span className="h-1.5 w-4 rounded-full bg-border-strong" />
         Workspace
       </p>
-      {WORKSPACE_NAV.map((item) => (
-        <NavLink key={item.to} to={item.to} end={item.end} onClick={onNavigate} className={navClass}>
-          <item.icon width={18} height={18} />
-          {item.label}
-        </NavLink>
-      ))}
+      <StationGroup items={WORKSPACE_NAV} onNavigate={onNavigate} />
 
       {repoId ? (
         <RepoSection repoId={repoId} onNavigate={onNavigate} />
@@ -72,7 +109,7 @@ export function Sidebar({ onNavigate }: { onNavigate?: () => void }) {
         <div className="flex-1" />
       )}
 
-      <div className="mt-4 rounded-xl border border-border bg-surface-raised/50 p-3">
+      <div className="mt-4 rounded-xl border border-border bg-background p-3">
         <p className="text-xs font-medium text-foreground">Understand any codebase</p>
         <p className="mt-1 text-[11px] leading-relaxed text-subtle">
           Map architecture, dependencies, and structure in minutes.
@@ -88,6 +125,7 @@ function RepoSection({ repoId, onNavigate }: { repoId: string; onNavigate?: () =
   const [params] = useSearchParams();
   const activeConversation = params.get('c');
   const { data: conversations = [], isLoading } = useConversations(repoId);
+  const { data: repo } = useRepository(repoId);
   const del = useDeleteConversation(repoId);
   const rename = useRenameConversation(repoId);
   const [confirmId, setConfirmId] = useState<string | null>(null);
@@ -125,15 +163,14 @@ function RepoSection({ repoId, onNavigate }: { repoId: string; onNavigate?: () =
 
   return (
     <div className="mt-6 flex min-h-0 flex-1 flex-col">
-      <p className="px-3 pb-1 text-[11px] font-medium uppercase tracking-wider text-subtle">
-        This project
+      <p className="flex items-center gap-2 px-3 pb-2 font-mono text-[10px] uppercase tracking-[0.16em] text-subtle">
+        <span
+          className="h-1.5 w-4 shrink-0 rounded-full"
+          style={{ background: repo ? lineColorFor(repo.name) : 'var(--color-border-strong)' }}
+        />
+        <span className="truncate">{repo?.name ?? 'This project'}</span>
       </p>
-      {REPO_NAV.map((item) => (
-        <NavLink key={item.label} to={item.to} end={item.end} onClick={onNavigate} className={navClass}>
-          <item.icon width={18} height={18} />
-          {item.label}
-        </NavLink>
-      ))}
+      <StationGroup items={REPO_NAV} onNavigate={onNavigate} />
 
       <div className="mt-4 flex min-h-0 flex-1 flex-col">
         <Button size="sm" className="w-full" onClick={() => openExplain()}>

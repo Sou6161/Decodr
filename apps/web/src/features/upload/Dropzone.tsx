@@ -167,7 +167,7 @@ export function Dropzone({ onSelect, isUploading, error }: DropzoneProps) {
               : 'Looking through the folder for source files…'
             : isUploading
               ? 'Sending your source files to Decodr.'
-              : 'Drag a folder, or click to choose one. Only source files are read — node_modules, builds, and .git are skipped automatically.'}
+              : 'Drag a folder in, or click to pick one. Only source files are read. node_modules, builds and .git are left out for you.'}
         </p>
 
         {!isUploading && !scanning && (

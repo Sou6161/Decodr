@@ -15,7 +15,7 @@ export function AppShell() {
   return (
     <div className="min-h-screen lg:grid lg:grid-cols-[260px_1fr]">
       {/* Desktop sidebar */}
-      <aside className="sticky top-0 hidden h-screen border-r border-border bg-surface/40 lg:block">
+      <aside className="theme-ink sticky top-0 hidden h-screen lg:block">
         <Sidebar />
       </aside>
 
@@ -31,7 +31,7 @@ export function AppShell() {
               onClick={() => setMobileNavOpen(false)}
             />
             <motion.aside
-              className="fixed inset-y-0 left-0 z-50 w-[260px] border-r border-border bg-surface lg:hidden"
+              className="theme-ink fixed inset-y-0 left-0 z-50 w-[260px] lg:hidden"
               initial={{ x: '-100%' }}
               animate={{ x: 0 }}
               exit={{ x: '-100%' }}

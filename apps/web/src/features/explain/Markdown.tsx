@@ -111,7 +111,7 @@ function CodeBlock({ code, lang }: { code: string; lang: string }) {
   };
 
   return (
-    <div className="group relative my-4 overflow-hidden rounded-xl border border-border-strong bg-[oklch(0.15_0.03_248)] shadow-sm shadow-black/30">
+    <div className="group relative my-4 overflow-hidden rounded-xl border border-border bg-code">
       <div className="flex items-center justify-between border-b border-border/60 px-3.5 py-1.5">
         <span className="font-mono text-[11px] uppercase tracking-wider text-subtle">
           {lang || 'code'}

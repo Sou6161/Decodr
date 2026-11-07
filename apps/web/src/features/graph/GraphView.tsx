@@ -197,7 +197,7 @@ function GraphViewInner({ graph }: { graph: RepositoryGraph }) {
           nodesDraggable={false}
           onNodeClick={(_, node) => setSelectedId(node.id)}
           onPaneClick={() => setSelectedId(null)}
-          colorMode="dark"
+          colorMode="light"
           fitView
           fitViewOptions={{ padding: 0.2 }}
           minZoom={0.2}
@@ -205,12 +205,12 @@ function GraphViewInner({ graph }: { graph: RepositoryGraph }) {
           proOptions={{ hideAttribution: true }}
         >
           <Background variant={BackgroundVariant.Dots} gap={22} size={1} color="var(--color-border)" />
-          <Controls className="!border-border !bg-surface-raised" showInteractive={false} />
+          <Controls className="!border-border !bg-surface" showInteractive={false} />
           <MiniMap
             pannable
             className="!hidden !bg-surface sm:!block"
-            maskColor="oklch(0.16 0.006 285 / 0.7)"
-            nodeColor={() => 'var(--color-primary-soft)'}
+            maskColor="rgb(243 244 239 / 0.75)"
+            nodeColor={() => 'var(--color-line-teal)'}
           />
         </ReactFlow>
       )}

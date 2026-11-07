@@ -1,45 +1,59 @@
 @import 'tailwindcss';
 
 /*
- * Arcloom — "anime twilight" theme.
- * A soft anime dusk sky as the backdrop (stars, moon, drifting sakura), with
- * FLAT cel-shaded colors on top (no gradients on UI) and chunky, playful shapes.
+ * Decodr — "transit map" theme.
+ * Light map paper with a faint grid, near-black ink, and bold flat route
+ * colours (teal, orange, raspberry, sunflower, blue, lime) used the way a
+ * metro map uses its lines: one colour per route, white stations on top.
  */
 @theme {
-  /* Panel surfaces — deep moonlit navy, kept fairly opaque so text stays crisp */
-  --color-background: oklch(0.19 0.03 245);
-  --color-surface: oklch(0.235 0.035 244);
-  --color-surface-raised: oklch(0.285 0.04 242);
-  --color-overlay: oklch(0.265 0.04 242);
+  /* Paper and panels */
+  --color-background: #f3f4ef;
+  --color-surface: #ffffff;
+  --color-surface-raised: #eef0e9;
+  --color-overlay: #ffffff;
 
-  /* Bold, crisp outlines (anime linework) */
-  --color-border: oklch(0.37 0.035 240);
-  --color-border-strong: oklch(0.5 0.05 232);
+  /* Hairlines */
+  --color-border: #e1e3db;
+  --color-border-strong: #c6c9be;
 
-  /* Text */
-  --color-foreground: oklch(0.98 0.01 220);
-  --color-muted: oklch(0.8 0.02 220);
-  --color-subtle: oklch(0.63 0.03 225);
+  /* Ink */
+  --color-foreground: #17191c;
+  --color-muted: #4a4f57;
+  --color-subtle: #6c717a;
 
-  /* Flat vibrant accents — cool cyan + warm gold, no pink/violet */
-  --color-primary: oklch(0.75 0.14 214); /* sky cyan */
-  --color-primary-foreground: oklch(0.15 0.03 240);
-  --color-primary-soft: oklch(0.52 0.12 216); /* darker edge for 3D buttons */
-  --color-accent: oklch(0.84 0.14 84); /* warm gold */
-  --color-accent-soft: oklch(0.58 0.12 74);
-  --color-sky: oklch(0.8 0.12 200); /* teal-cyan */
-  --color-gold: oklch(0.87 0.14 88); /* moon / sparkle */
+  /* Route colours. primary/accent/sky are text-safe on white; gold is a fill. */
+  --color-primary: #00857a; /* teal line */
+  --color-primary-foreground: #ffffff;
+  --color-primary-soft: #00635b; /* pressed edge for chunky buttons */
+  --color-accent: #d24d05; /* signal orange */
+  --color-accent-soft: #a63d04;
+  --color-sky: #cc2f6a; /* raspberry */
+  --color-gold: #f4b400; /* sunflower */
 
-  --color-success: oklch(0.8 0.15 162); /* emerald */
-  --color-warning: oklch(0.86 0.14 86);
-  --color-danger: oklch(0.7 0.17 25);
-  --color-danger-soft: oklch(0.5 0.15 25);
+  /* Full-strength line colours for maps and charts */
+  --color-line-teal: #00857a;
+  --color-line-orange: #f26a1b;
+  --color-line-pink: #e0457b;
+  --color-line-sun: #f4b400;
+  --color-line-blue: #2f6fde;
+  --color-line-lime: #6aa82a;
+
+  --color-success: #2b8a3e;
+  --color-warning: #b76e00;
+  --color-danger: #d7263d;
+  --color-danger-soft: #a51c2e;
+
+  /* Code blocks and the landing terminal */
+  --color-code: #f7f8f3;
+  --color-ink: #1b1e22;
 
   --radius-xl: 1rem;
   --radius-2xl: 1.25rem;
 
+  --font-display: 'Bricolage Grotesque', 'Instrument Sans', ui-sans-serif, system-ui, sans-serif;
   --font-sans:
-    'Inter', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', sans-serif;
+    'Instrument Sans', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', sans-serif;
   --font-mono:
     'JetBrains Mono', ui-monospace, 'SF Mono', 'Cascadia Code', monospace;
 }
@@ -50,48 +64,38 @@
   }
 
   html {
-    color-scheme: dark;
+    color-scheme: light;
     scroll-behavior: smooth;
   }
 
   body {
     margin: 0;
     color: var(--color-foreground);
+    background-color: var(--color-background);
     font-family: var(--font-sans);
     -webkit-font-smoothing: antialiased;
     text-rendering: optimizeLegibility;
   }
 
-  /* The anime night sky: near-black navy up top, deepening to a moonlit teal
-   * glow over the horizon. Cool, calm, no warm/pink tones. */
+  /* Map grid: faint dots, like the reference grid on a printed map. */
   body::before {
     content: '';
     position: fixed;
     inset: 0;
     z-index: -30;
-    background: linear-gradient(
-      180deg,
-      oklch(0.13 0.03 255) 0%,
-      oklch(0.17 0.04 245) 38%,
-      oklch(0.21 0.05 220) 72%,
-      oklch(0.25 0.06 200) 100%
-    );
+    pointer-events: none;
+    background-image: radial-gradient(rgb(23 25 28 / 0.08) 1px, transparent 1.3px);
+    background-size: 24px 24px;
   }
 
-  /* Fine grain for a hand-painted feel. */
-  body::after {
-    content: '';
-    position: fixed;
-    inset: 0;
-    z-index: -29;
-    pointer-events: none;
-    opacity: 0.04;
-    mix-blend-mode: overlay;
-    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='140' height='140'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+  h1,
+  h2,
+  h3 {
+    text-wrap: balance;
   }
 
   ::selection {
-    background: var(--color-primary-soft);
+    background: color-mix(in oklch, var(--color-primary) 22%, transparent);
     color: var(--color-foreground);
   }
 
@@ -107,48 +111,45 @@
   ::-webkit-scrollbar-thumb:hover {
     background: var(--color-subtle);
   }
+}
 
-  /* Glowing light motes / fireflies drifting down. */
-  @keyframes mote-drift {
-    0% {
-      transform: translateY(-8vh) translateX(0);
-      opacity: 0;
-    }
-    12% {
-      opacity: 0.85;
-    }
-    88% {
-      opacity: 0.85;
-    }
-    100% {
-      transform: translateY(108vh) translateX(var(--drift, 40px));
-      opacity: 0;
-    }
-  }
-
-  @keyframes twinkle {
-    0%,
-    100% {
-      opacity: 0.25;
-    }
-    50% {
-      opacity: 1;
-    }
-  }
+/*
+ * Ink panels (the app sidebar): the same tokens flipped for a dark signage
+ * column, so anything rendered inside picks the right colours by itself.
+ */
+.theme-ink {
+  --color-background: #15181b;
+  --color-surface: #1b1e22;
+  --color-surface-raised: #262a2f;
+  --color-overlay: #262a2f;
+  --color-border: #31363c;
+  --color-border-strong: #4a5058;
+  --color-foreground: #f3f4ef;
+  --color-muted: #b9bec4;
+  --color-subtle: #8a9097;
+  --color-primary: #2bb5a6;
+  --color-primary-foreground: #0f1214;
+  --color-primary-soft: #1a7f74;
+  color: var(--color-foreground);
+  background: var(--color-surface);
 }
 
 @layer utilities {
-  /* Frosted panel over the sky. */
+  /* Frosted panel over the map paper. */
   .glass {
-    background: color-mix(in oklch, var(--color-surface) 78%, transparent);
+    background: color-mix(in oklch, var(--color-surface) 84%, transparent);
     backdrop-filter: blur(14px);
   }
 
-  /* Cel-shaded sticker shadow — a solid offset drop, no blur. */
+  /* Paper-card lift: a hairline plus a soft, low shadow. */
   .pop {
-    box-shadow: 0.4rem 0.4rem 0 0 oklch(0.11 0.03 250 / 0.9);
+    box-shadow:
+      0 1px 0 0 rgb(23 25 28 / 0.04),
+      0 22px 44px -26px rgb(23 25 28 / 0.35);
   }
   .pop-sm {
-    box-shadow: 0.25rem 0.25rem 0 0 oklch(0.11 0.03 250 / 0.85);
+    box-shadow:
+      0 1px 0 0 rgb(23 25 28 / 0.04),
+      0 12px 26px -18px rgb(23 25 28 / 0.3);
   }
 }

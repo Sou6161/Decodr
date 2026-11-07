@@ -16,7 +16,7 @@ function ComponentNodeImpl({ data, selected }: NodeProps<ComponentFlowNode>) {
   return (
     <div
       className={cn(
-        'w-[210px] rounded-xl border bg-surface-raised px-3.5 py-2.5 shadow-sm transition-all duration-150',
+        'w-[210px] rounded-xl border bg-surface px-3.5 py-2.5 shadow-[0_1px_0_0_rgb(23_25_28/0.04),0_8px_18px_-12px_rgb(23_25_28/0.3)] transition-all duration-150',
         selected
           ? 'border-primary ring-2 ring-primary/50'
           : 'border-border hover:border-border-strong',
