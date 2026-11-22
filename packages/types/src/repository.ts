@@ -2,7 +2,7 @@ import type { Id, ISODateString } from './common.js';
 
 /**
  * Lifecycle of an uploaded repository as it moves through the pipeline:
- * upload → extract → scan files → parse/analyze → ready.
+ * upload → prepare files → scan → parse/analyze → ready.
  */
 export const RepositoryStatus = {
   Pending: 'PENDING',

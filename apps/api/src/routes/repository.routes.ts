@@ -2,7 +2,7 @@ import { Router } from 'express';
 import { repositoryController } from '../controllers/repositoryController.js';
 import { conversationController } from '../controllers/conversationController.js';
 import { asyncHandler } from '../middleware/errorHandler.js';
-import { uploadZip, uploadFolder } from '../middleware/upload.js';
+import { uploadFolder } from '../middleware/upload.js';
 import { requireOwnedRepository } from '../middleware/owner.js';
 import { askLimiter, uploadLimiter } from '../middleware/rateLimit.js';
 
@@ -11,7 +11,6 @@ export const repositoryRouter: Router = Router();
 
 // Collection routes (scoped to the caller by owner token, not by :id).
 repositoryRouter.get('/', asyncHandler(repositoryController.list));
-repositoryRouter.post('/', uploadLimiter, uploadZip, asyncHandler(repositoryController.upload));
 repositoryRouter.post('/folder', uploadLimiter, uploadFolder, asyncHandler(repositoryController.uploadFolder));
 
 // Everything addressed by :id must belong to the caller's session.

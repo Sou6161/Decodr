@@ -248,7 +248,7 @@ function Stop({ n, name, color, lead, points, exhibit, first, last }: StopProps)
 
 const SCAN_LINES = [
   { text: '$ decodr ./my-app', tone: 'prompt' },
-  { text: '→ extracting · scanning · parsing (ts compiler api)', tone: 'muted' },
+  { text: '→ preparing · scanning · parsing (ts compiler api)', tone: 'muted' },
   { text: '✓ 214 files · 62 components · 11 hooks · 7 routes', tone: 'ok' },
   { text: '✓ 148 relationships mapped', tone: 'ok' },
   { text: '✓ ready in 3.2s', tone: 'ok' },

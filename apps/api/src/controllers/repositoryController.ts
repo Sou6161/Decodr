@@ -15,7 +15,7 @@ import { getRepositoryGraph } from '../services/graphService.js';
 import { getDashboard } from '../services/dashboardService.js';
 import { fileService } from '../services/fileService.js';
 import { AppError } from '../utils/AppError.js';
-import { removeFile } from '../utils/archive.js';
+import { removeFile } from '../utils/files.js';
 
 /** Thin HTTP layer: parse input, call a service, shape the response. */
 export const repositoryController = {
@@ -54,15 +54,6 @@ export const repositoryController = {
     const progress = await repositoryService.getProgress(requireId(req));
     const body: RepositoryProgressResponse = { progress };
     res.json(body);
-  },
-
-  async upload(req: Request, res: Response): Promise<void> {
-    if (!req.file) {
-      throw AppError.badRequest('Attach a .zip file under the form field "file".');
-    }
-    const repository = await uploadService.uploadAndProcess(req.file, req.ownerToken);
-    const body: UploadRepositoryResponse = { repository };
-    res.status(202).json(body);
   },
 
   async uploadFolder(req: Request, res: Response): Promise<void> {

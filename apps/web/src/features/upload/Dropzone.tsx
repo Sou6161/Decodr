@@ -1,6 +1,6 @@
 import { useCallback, useRef, useState, type DragEvent } from 'react';
 import { cn } from '@/utils/cn';
-import { FolderIcon, UploadIcon } from '@/components/icons';
+import { FolderIcon } from '@/components/icons';
 import { Spinner } from '@/components/ui';
 import {
   collectFromDataTransfer,
@@ -18,32 +18,40 @@ interface DropzoneProps {
   error?: string | null;
 }
 
-const MAX_ZIP_MB = Number(import.meta.env.VITE_MAX_UPLOAD_MB ?? 500);
+/**
+ * True on a phone or tablet: a coarse pointer and no hover. Those devices have
+ * no drag-and-drop from a file manager and no mouse to "click", so the
+ * instructions have to talk about tapping instead.
+ *
+ * Folder picking needs a current phone browser — Safari on iOS 18.4+, Chrome
+ * 132+ or Firefox 142+ on Android. Older phone browsers are not supported.
+ */
+function isTouchDevice(): boolean {
+  if (typeof window === 'undefined' || !window.matchMedia) return false;
+  return window.matchMedia('(pointer: coarse)').matches && !window.matchMedia('(hover: hover)').matches;
+}
 
-/** Hand-built folder / ZIP picker: pick a folder, drop a folder, or drop a .zip. */
+/** Hand-built folder picker: pick a project folder, or drop one in. */
 export function Dropzone({ onSelect, isUploading, error }: DropzoneProps) {
   const folderRef = useRef<HTMLInputElement>(null);
-  const zipRef = useRef<HTMLInputElement>(null);
   const [dragging, setDragging] = useState(false);
   const [localError, setLocalError] = useState<string | null>(null);
   // Reading a folder is a separate, sometimes slow phase before any upload
   // starts. Showing "Uploading…" through it made a scan look like a stall.
   const [scanning, setScanning] = useState(false);
   const [progress, setProgress] = useState<ScanProgress | null>(null);
+  // Read once: whether this is a touch device does not change mid-visit.
+  const [touch] = useState(isTouchDevice);
 
   const emit = useCallback(
     (selection: UploadSelection | null) => {
       setLocalError(null);
       if (!selection) {
-        setLocalError('Drop a project folder or a .zip file.');
+        setLocalError('Drop a project folder.');
         return;
       }
-      if (selection.kind === 'folder' && selection.files.length === 0) {
+      if (selection.files.length === 0) {
         setLocalError('No source files (.ts, .tsx, .js, .jsx) found in that folder.');
-        return;
-      }
-      if (selection.kind === 'zip' && selection.file.size > MAX_ZIP_MB * 1024 * 1024) {
-        setLocalError(`ZIP too large. Maximum size is ${MAX_ZIP_MB} MB.`);
         return;
       }
       onSelect(selection);
@@ -99,15 +107,6 @@ export function Dropzone({ onSelect, isUploading, error }: DropzoneProps) {
     }
   };
 
-  const handleZipInput = (file: File | undefined) => {
-    if (!file) return;
-    if (!file.name.toLowerCase().endsWith('.zip')) {
-      setLocalError('That file is not a .zip.');
-      return;
-    }
-    emit({ kind: 'zip', file });
-  };
-
   const shownError = localError ?? error;
 
   return (
@@ -130,7 +129,7 @@ export function Dropzone({ onSelect, isUploading, error }: DropzoneProps) {
         }}
         onDragLeave={() => setDragging(false)}
         className={cn(
-          'flex cursor-pointer flex-col items-center justify-center rounded-2xl border-2 border-dashed px-6 py-16 text-center transition-all duration-200',
+          'flex cursor-pointer flex-col items-center justify-center rounded-2xl border-2 border-dashed px-5 py-12 text-center transition-all duration-200 sm:px-6 sm:py-16',
           'outline-none focus-visible:ring-2 focus-visible:ring-primary/60',
           dragging
             ? 'border-primary bg-primary/5'
@@ -158,7 +157,9 @@ export function Dropzone({ onSelect, isUploading, error }: DropzoneProps) {
               ? 'Uploading…'
               : dragging
                 ? 'Drop to upload'
-                : 'Drop your project folder here'}
+                : touch
+                  ? 'Choose your project folder'
+                  : 'Drop your project folder here'}
         </h3>
         <p className="mt-1.5 max-w-md text-sm text-muted">
           {scanning
@@ -167,22 +168,10 @@ export function Dropzone({ onSelect, isUploading, error }: DropzoneProps) {
               : 'Looking through the folder for source files…'
             : isUploading
               ? 'Sending your source files to Decodr.'
-              : 'Drag a folder in, or click to pick one. Only source files are read. node_modules, builds and .git are left out for you.'}
+              : touch
+                ? 'Tap to pick the folder from your Files app. Only source files are read. node_modules, builds and .git are left out for you.'
+                : 'Drag a folder in, or click to pick one. Only source files are read. node_modules, builds and .git are left out for you.'}
         </p>
-
-        {!isUploading && !scanning && (
-          <button
-            type="button"
-            onClick={(e) => {
-              e.stopPropagation();
-              zipRef.current?.click();
-            }}
-            className="mt-4 inline-flex items-center gap-1.5 text-xs font-medium text-muted underline-offset-2 hover:text-foreground hover:underline"
-          >
-            <UploadIcon width={14} height={14} />
-            or upload a .zip instead
-          </button>
-        )}
 
         {/* Folder picker: webkitdirectory is set imperatively (not a standard React prop). */}
         <input
@@ -197,13 +186,6 @@ export function Dropzone({ onSelect, isUploading, error }: DropzoneProps) {
           multiple
           className="hidden"
           onChange={(e) => handleFolderInput(e.target.files)}
-        />
-        <input
-          ref={zipRef}
-          type="file"
-          accept=".zip,application/zip,application/x-zip-compressed"
-          className="hidden"
-          onChange={(e) => handleZipInput(e.target.files?.[0] ?? undefined)}
         />
       </div>
 

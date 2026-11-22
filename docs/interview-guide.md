@@ -93,7 +93,7 @@ OpenAI-compatible gateway (OpenRouter) — primary model + fallback chain
    - Up to **2 continuations** while `finishReason === 'length'`: "Continue from exactly where you stopped", joined with no space. If it's still cut off, `truncated: true` is set and the UI shows a **Continue** button.
    - `stripTextToolCalls` removes `<tool_call>` leaks. An empty answer returns 502 `AI_EMPTY_RESPONSE`.
 7. **Persist** the user message and the assistant message (`contextPaths`, `openedPaths`, `model`, `truncated`), then touch the conversation. Then **fire-and-forget**: extend the rolling summary, generate follow-ups, and generate a title (skipped for smalltalk).
-8. **`event: done`** carries the same payload as the JSON endpoint. The client writes both messages into the TanStack cache with `setQueryData` (no flicker), and **1.5 s later** re-invalidates the list and detail queries to pick up the AI title and follow-up chips.
+8. **`event: done`** carries the same payload as the JSON endpoint. The client writes both messages into the TanStack cache with `setQueryData` (no flicker), and then re-invalidates the list and detail queries at 2, 5, 9, 15 and 25 s (stopping once the title and follow-ups are in) to pick them up.
 
 ---
 
@@ -327,7 +327,7 @@ Limits: **3 tool rounds**, a **90,000-char read budget** split evenly across par
 | Tests | API: 12 files, 89 cases (incl. HTTP-level app tests) · web: 2 files, 6 cases · run in CI on every push/PR |
 | Analysis write transaction | one `$transaction`, 120 s timeout |
 | SSE heartbeat | `: ping` comment every 15 s |
-| Title/follow-up refetch | at 1.5 s, 4 s, 9 s; stops once follow-ups arrive |
+| Title/follow-up refetch | at 2, 5, 9, 15, 25 s; stops once title and follow-ups arrive |
 
 ---
 
@@ -339,7 +339,7 @@ Limits: **3 tool rounds**, a **90,000-char read budget** split evenly across par
 5. **No embeddings:** see 6.3.
 6. **Rule-based intent:** an LLM classifier would double latency and cost. Misclassifying towards `code` is harmless because the prompt handles any message anyway.
 7. **One context budget instead of Quick/Detailed modes:** users can't predict how much context they need. The model sets the depth (LENGTH_NOTE) and fetches more with tools.
-8. **Background title, follow-ups and summary:** never delay the answer. The client re-reads the thread at 1.5 s, 4 s and 9 s, stopping as soon as the follow-ups are in.
+8. **Background title, follow-ups and summary:** never delay the answer. The client re-reads the thread at 2, 5, 9, 15 and 25 s, stopping as soon as the title and follow-ups are in.
 9. **Creating the conversation before the model call:** the browser learns the thread id immediately, so stopping the first answer isn't lost. Empty threads are cleaned up on failure.
 10. **TanStack Query for server state, Zustand only for UI state:** no duplicated server data, and caching, retries and invalidation come for free.
 11. **Hand-built UI, Markdown and charts:** shows the craft, gives full control of the dark theme, smaller bundle, no lock-in. *Trade-off:* more code to maintain, and the Markdown parser is a subset.
@@ -373,7 +373,7 @@ A review of the code turned up 20 weaknesses. They were fixed in one pass (Octob
 | 14 | No SSE heartbeat | `: ping` comment every 15 s while streaming | `conversationController.askStream` |
 | 15 | Markdown re-parsed the whole answer per token | Finished blocks (before the last blank line outside a fence) render through a memoised component; only the tail is re-parsed | `Markdown.tsx` (`splitSettled`) |
 | 16 | Every file read twice | Scanner content passed to the parser | `repositoryProcessor` → `analysisService` → `analyzer` |
-| 17 | One 1.5 s refetch for title/follow-ups | Re-reads at 1.5/4/9 s, stopping once follow-ups arrive | `features/explain/hooks.ts` |
+| 17 | One 1.5 s refetch for title/follow-ups | Re-reads at 2/5/9/15/25 s, stopping once title and follow-ups arrive | `features/explain/hooks.ts` |
 | 18 | No HTTP tests, no web tests, no CI | HTTP-level app tests, web vitest suite, GitHub Actions CI | `src/__tests__/app.test.ts`, `apps/web/vitest.config.ts`, `.github/workflows/ci.yml` |
 | 19 | Dead `FeatureMap.tsx` | Removed with its palette helpers | — |
 | 20 | Duplicated `rootTagIdentifier` | One export in `astUtils.ts` | — |

@@ -4,7 +4,7 @@ import { RepositoryStatus } from '@decodr/types';
 import { storageRoot } from '../config/env.js';
 import { logger } from '../utils/logger.js';
 import { AppError } from '../utils/AppError.js';
-import { extractZipFile, removeDir, removeFile } from '../utils/archive.js';
+import { removeDir, removeFile } from '../utils/files.js';
 import { storableText } from '../utils/storableText.js';
 import { scanRepository } from '../scanner/fileScanner.js';
 import { repositoryRepository } from '../repositories/repositoryRepository.js';
@@ -29,7 +29,7 @@ export interface StagedFile {
  *
  *   SCANNING → ANALYZING → READY
  *
- * Shared by both intake paths (ZIP extraction and direct folder upload).
+ * Runs once the uploaded folder's files are in place on disk.
  */
 async function runAnalysis(repositoryId: string, projectDir: string): Promise<void> {
   await repositoryRepository.update(repositoryId, { status: RepositoryStatus.Scanning });
@@ -88,18 +88,14 @@ async function runAnalysis(repositoryId: string, projectDir: string): Promise<vo
 /**
  * What the project page shows when analysis fails. Our own AppErrors are
  * written for people, so they pass through; errors from libraries (the
- * unzipper, the filesystem) are not, so they get a plain explanation instead.
+ * filesystem, the parser) are not, so they get a plain explanation instead.
  * The raw message always goes to the log.
  */
 function failureMessage(err: unknown): string {
   if (err instanceof AppError) return err.message;
   const code = (err as NodeJS.ErrnoException | undefined)?.code ?? '';
-  const text = `${code} ${err instanceof Error ? err.message : ''}`;
-  if (/FILE_ENDED|central directory|signature|not a zip|zip/i.test(text)) {
-    return "We couldn't open this ZIP. It may be damaged or only partly downloaded. Try zipping the folder again, or upload the folder itself.";
-  }
   if (code === 'ENOSPC') {
-    return 'The server ran out of room while unpacking this project. Try a smaller upload.';
+    return 'The server ran out of room while saving this project. Try a smaller upload.';
   }
   return 'Something went wrong while analyzing this project. Try uploading it again.';
 }
@@ -110,27 +106,6 @@ async function markFailed(repositoryId: string, err: unknown): Promise<void> {
   await repositoryRepository
     .update(repositoryId, { status: RepositoryStatus.Failed, error: failureMessage(err) })
     .catch((updateErr) => logger.error('Failed to record FAILED status', updateErr));
-}
-
-/**
- * ZIP intake: extract the archive, then run analysis. Detached from the request;
- * failures are recorded as a FAILED status.
- */
-export async function processRepository(
-  repositoryId: string,
-  zipPath: string,
-): Promise<void> {
-  const extractDir = path.join(storageRoot, repositoryId);
-  try {
-    await repositoryRepository.update(repositoryId, { status: RepositoryStatus.Extracting });
-    await extractZipFile(zipPath, extractDir);
-    await removeFile(zipPath).catch(() => undefined);
-    await runAnalysis(repositoryId, extractDir);
-  } catch (err) {
-    await markFailed(repositoryId, err);
-    await removeFile(zipPath).catch(() => undefined);
-    await removeDir(extractDir).catch(() => undefined);
-  }
 }
 
 /**

@@ -7,7 +7,7 @@ export const STATUS_META: Record<
   { tone: NonNullable<BadgeProps['tone']>; label: string }
 > = {
   [RepositoryStatus.Pending]: { tone: 'neutral', label: 'Queued' },
-  [RepositoryStatus.Extracting]: { tone: 'primary', label: 'Extracting' },
+  [RepositoryStatus.Extracting]: { tone: 'primary', label: 'Preparing' },
   [RepositoryStatus.Scanning]: { tone: 'primary', label: 'Scanning' },
   [RepositoryStatus.Analyzing]: { tone: 'primary', label: 'Analyzing' },
   [RepositoryStatus.Ready]: { tone: 'success', label: 'Ready' },

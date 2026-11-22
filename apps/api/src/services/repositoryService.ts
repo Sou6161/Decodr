@@ -6,7 +6,7 @@ import type {
 import path from 'node:path';
 import { RepositoryStatus } from '@decodr/types';
 import { storageRoot } from '../config/env.js';
-import { removeDir } from '../utils/archive.js';
+import { removeDir } from '../utils/files.js';
 import { logger } from '../utils/logger.js';
 import { repositoryRepository } from '../repositories/repositoryRepository.js';
 import { fileRepository } from '../repositories/fileRepository.js';
@@ -25,7 +25,7 @@ import { AppError } from '../utils/AppError.js';
 /** Maps each lifecycle status to a coarse progress percentage for the UI. */
 const STATUS_PROGRESS: Record<RepositoryStatus, { percent: number; message: string }> = {
   [RepositoryStatus.Pending]: { percent: 5, message: 'Queued' },
-  [RepositoryStatus.Extracting]: { percent: 25, message: 'Extracting archive' },
+  [RepositoryStatus.Extracting]: { percent: 25, message: 'Preparing files' },
   [RepositoryStatus.Scanning]: { percent: 50, message: 'Scanning files' },
   [RepositoryStatus.Analyzing]: { percent: 80, message: 'Analyzing components' },
   [RepositoryStatus.Ready]: { percent: 100, message: 'Analysis complete' },

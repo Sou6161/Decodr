@@ -12,7 +12,7 @@ Decodr is a codebase-analysis platform for React + TypeScript projects. Pick a p
 
 ## Features (MVP)
 
-1. **Folder upload** — pick a project folder; the browser walks it, skips `node_modules` and build output, and uploads only source files and manifests. ZIP upload is also supported.
+1. **Folder upload** — pick a project folder; the browser walks it, skips `node_modules` and build output, and uploads only source files and manifests.
 2. **Static parser** — the TypeScript Compiler API extracts components, imports/exports, custom hooks, React Router routes (nested ones joined to full URLs) and file-based routes (Expo Router, Next App Router, Next Pages Router). Imports resolve through tsconfig/jsconfig `paths` (`@/…`), NodeNext-style `.js` specifiers, barrel re-exports, namespace imports and `lazy()`/`require`. Syntax-only, so a project parses without installing its dependencies.
 3. **Component graph** — dependency graph persisted in PostgreSQL and visualised with React Flow.
 4. **Dashboard** — files, components, hooks, routes, largest and most-imported components, folder tree.

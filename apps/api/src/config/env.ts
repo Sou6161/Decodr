@@ -29,7 +29,6 @@ const EnvSchema = z.object({
   DATABASE_URL: z.string().min(1, 'DATABASE_URL is required'),
 
   STORAGE_DIR: z.string().default('./storage'),
-  MAX_UPLOAD_MB: z.coerce.number().int().positive().default(50),
 
   AI_PROVIDER: z
     .nativeEnum(AIProviderName)

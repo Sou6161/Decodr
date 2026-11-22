@@ -6,7 +6,7 @@ import { Train } from '@/components/transit';
 import { cn } from '@/utils/cn';
 
 const STAGES: { status: RepositoryStatus; label: string }[] = [
-  { status: RepositoryStatus.Extracting, label: 'Extracting archive' },
+  { status: RepositoryStatus.Extracting, label: 'Preparing files' },
   { status: RepositoryStatus.Scanning, label: 'Scanning files' },
   { status: RepositoryStatus.Analyzing, label: 'Analyzing components' },
   { status: RepositoryStatus.Ready, label: 'Ready' },

@@ -3,14 +3,7 @@ import { apiClient } from '@/services/apiClient';
 import type { PickedFile } from './collectFiles';
 
 export const uploadApi = {
-  /** Upload a single ZIP archive. */
-  uploadZip: (file: File) => {
-    const form = new FormData();
-    form.append('file', file);
-    return apiClient.postForm<UploadRepositoryResponse>('/repositories', form);
-  },
-
-  /** Upload pre-filtered source files from a folder (no archive). */
+  /** Upload pre-filtered source files from a project folder. */
   uploadFolder: (name: string, files: PickedFile[]) => {
     const form = new FormData();
     form.append('name', name);

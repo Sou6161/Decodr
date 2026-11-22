@@ -10,9 +10,11 @@ export interface PickedFile {
   path: string;
 }
 
-export type UploadSelection =
-  | { kind: 'zip'; file: File }
-  | { kind: 'folder'; files: PickedFile[]; name: string };
+export interface UploadSelection {
+  kind: 'folder';
+  files: PickedFile[];
+  name: string;
+}
 
 const IGNORED_DIRS = new Set([
   'node_modules', '.git', '.svn', '.hg', 'dist', 'build', 'out', '.next', '.nuxt',
@@ -138,7 +140,7 @@ async function walkEntry(entry: FsEntry, prefix: string, out: PickedFile[]): Pro
   }
 }
 
-/** Resolves a drag-drop into a zip file or a folder's source files. */
+/** Resolves a drag-drop into a folder's source files. */
 export async function collectFromDataTransfer(
   dt: DataTransfer,
 ): Promise<UploadSelection | null> {
@@ -148,12 +150,6 @@ export async function collectFromDataTransfer(
     .filter((e): e is FileSystemEntry => e !== null)
     .map((e) => e as unknown as FsEntry);
 
-  // Single .zip dropped.
-  if (entries.length === 1 && entries[0]!.isFile) {
-    const file = dt.files[0];
-    if (file && file.name.toLowerCase().endsWith('.zip')) return { kind: 'zip', file };
-  }
-
   if (entries.length > 0) {
     const collected: PickedFile[] = [];
     for (const entry of entries) await walkEntry(entry, '', collected);
@@ -162,9 +158,6 @@ export async function collectFromDataTransfer(
     return { kind: 'folder', files: [], name: rootName(collected) };
   }
 
-  // Fallback: a plain file (e.g. a zip) with no entry API.
-  const file = dt.files[0];
-  if (file && file.name.toLowerCase().endsWith('.zip')) return { kind: 'zip', file };
   return null;
 }
 

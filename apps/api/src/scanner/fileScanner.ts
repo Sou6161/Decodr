@@ -15,14 +15,14 @@ export interface ScannedFile {
 }
 
 export interface ScanResult {
-  /** Absolute path treated as the project root (unwrapped from the ZIP folder). */
+  /** Absolute path treated as the project root (unwrapped from a single wrapping folder). */
   projectRoot: string;
   files: ScannedFile[];
   totalLines: number;
 }
 
 /**
- * Many ZIPs wrap the project in a single top-level folder. Unwrap nested
+ * Uploads often wrap the project in a single top-level folder. Unwrap nested
  * single-folder layers so repo-relative paths start at the real project root
  * (e.g. "src/App.tsx" rather than "my-app/src/App.tsx").
  */

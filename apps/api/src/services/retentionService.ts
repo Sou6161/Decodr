@@ -2,7 +2,7 @@ import path from 'node:path';
 import { readdir, stat } from 'node:fs/promises';
 import { storageRoot } from '../config/env.js';
 import { logger } from '../utils/logger.js';
-import { removeDir, removeFile } from '../utils/archive.js';
+import { removeDir, removeFile } from '../utils/files.js';
 import { repositoryRepository } from '../repositories/repositoryRepository.js';
 
 /** Where multer lands uploads before the processor moves them into place. */
